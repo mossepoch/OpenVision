@@ -1,6 +1,7 @@
 # OpenVision
 
 OpenVision 是一个面向工业/安防/零售等场景的视觉智能平台前端项目，涵盖摄像头接入、实时监控、数据标注、模型训练、告警与报表等全链路模块，提供现代化的控制台与门户体验。
+
 <img width="1920" height="934" alt="image" src="https://github.com/user-attachments/assets/2bf6801a-ff60-49d9-ad66-3fb83bfd7d06" />
 
 ## 关键特性
