@@ -1,228 +1,241 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import styles from './LoginPage.module.css';
+
+function GoogleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M18.171 10.3889C18.171 9.6694 18.111 9.1444 17.981 8.6H10V11.8472H14.521C14.421 12.6541 13.885 13.8694 12.695 14.6861L12.679 14.7948L15.329 16.807L15.513 16.825C17.199 15.2986 18.171 13.0528 18.171 10.3889Z" fill="#4285F4" />
+      <path d="M10 19.02C12.387 19.02 14.411 18.24 15.889 16.9L12.671 14.76C11.917 15.28 10.906 15.64 10 15.64C7.615 15.64 5.611 14.11 4.897 12L4.792 12.009L2.036 14.099L2 14.197C3.468 17.056 6.484 19.02 10 19.02Z" fill="#34A853" />
+      <path d="M4.849 12.1009C4.661 11.5565 4.552 10.9731 4.552 10.3704C4.552 9.76756 4.661 9.18425 4.839 8.63981L4.834 8.52386L2.044 6.4L1.952 6.44256C1.347 7.62869 1 8.96066 1 10.3704C1 11.7801 1.347 13.112 1.952 14.2981L4.849 12.1009Z" fill="#FBBC05" />
+      <path d="M10 4.38331C11.653 4.38331 12.784 5.09303 13.429 5.68612L15.948 3.275C14.401 1.86528 12.387 1 10 1C6.484 1 3.468 2.96387 2 5.82218L4.887 8.01943C5.611 5.90972 7.615 4.38331 10 4.38331Z" fill="#EB4335" />
+    </svg>
+  );
+}
+
+function EyeIcon({ showPassword }: { showPassword: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M1.81241 10.1631C1.10414 9.24289 0.75 8.78281 0.75 7.41667C0.75 6.05052 1.10414 5.59044 1.81241 4.67028C3.22664 2.83297 5.59843 0.75 9.08333 0.75C12.5682 0.75 14.94 2.83297 16.3543 4.67028C17.0625 5.59044 17.4167 6.05052 17.4167 7.41667C17.4167 8.78281 17.0625 9.24289 16.3543 10.1631C14.94 12.0004 12.5682 14.0833 9.08333 14.0833C5.59843 14.0833 3.22664 12.0004 1.81241 10.1631Z"
+        transform="translate(0.917, 2.583)"
+        stroke="#868686"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M5.75 3.25C5.75 4.63071 4.63071 5.75 3.25 5.75C1.86929 5.75 0.75 4.63071 0.75 3.25C0.75 1.86929 1.86929 0.75 3.25 0.75C4.63071 0.75 5.75 1.86929 5.75 3.25Z"
+        transform="translate(7.5, 7.5)"
+        stroke="#868686"
+        strokeWidth="1.5"
+      />
+      {!showPassword && (
+        <line x1="3" y1="17" x2="17" y2="3" stroke="#868686" strokeWidth="1.5" strokeLinecap="round" />
+      )}
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!account.trim() || !password.trim()) {
-      setError('请输入账号和密码');
+      setError('请输入用户名和密码');
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigate('/dashboard');
-    }, 800);
+    setError('');
+    navigate('/dashboard');
   };
 
   return (
-    <div
-      className="min-h-screen w-full flex"
-      style={{ fontFamily: "'Inter', 'PingFang SC', sans-serif", background: '#f5f5f7' }}
-    >
-      {/* ── 左侧品牌面板 ── */}
-      <div
-        className="hidden lg:flex flex-col w-[480px] flex-shrink-0 relative overflow-hidden"
-        style={{
-          background: 'linear-gradient(160deg, #a78bfa 0%, #7c3aed 45%, #6d28d9 100%)',
-        }}
-      >
-        {/* 光晕 */}
-        <div
-          className="absolute top-[-100px] left-[-60px] w-[380px] h-[380px] rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(196,167,255,0.45) 0%, transparent 65%)' }}
-        />
-        <div
-          className="absolute bottom-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 65%)' }}
-        />
-        {/* 点阵纹理 */}
-        <div
-          className="absolute inset-0 opacity-[0.08] pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(circle, #fff 1.2px, transparent 1.2px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+    <div className={styles.page}>
+      <div className={styles.container}>
+        <div className={styles.leftPanel}>
+          <div className={styles.leftBg}>
+            <div className={styles.gradientWrap}>
+              <div className={styles.eclipse}>
+                <div className={styles.eclipseInner}>
+                  <svg className={styles.svgBlock} fill="none" preserveAspectRatio="none" viewBox="0 0 722 715">
+                    <g filter="url(#f1)">
+                      <ellipse cx="361" cy="358" fill="url(#g1)" rx="161" ry="158" />
+                    </g>
+                    <defs>
+                      <filter
+                        id="f1"
+                        x="0"
+                        y="0"
+                        width="722"
+                        height="715"
+                        filterUnits="userSpaceOnUse"
+                        colorInterpolationFilters="sRGB"
+                      >
+                        <feFlood floodOpacity="0" result="bg" />
+                        <feBlend in="SourceGraphic" in2="bg" mode="normal" result="shape" />
+                        <feGaussianBlur result="blur" stdDeviation="100" />
+                      </filter>
+                      <linearGradient id="g1" x1="361" y1="200" x2="361" y2="515" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#42DDFF" />
+                        <stop offset="1" stopColor="#1170FF" stopOpacity="0.46" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
 
-        {/* Logo */}
-        <div className="relative z-10 px-10 pt-10 flex items-center gap-2.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-white/80 text-[13px] tracking-widest font-semibold">···</span>
-            <span className="text-white text-[17px] font-bold tracking-wide">OpenVision</span>
+              <div className={styles.planetPink}>
+                <div className={styles.planetPinkInner}>
+                  <svg className={styles.svgBlock} fill="none" preserveAspectRatio="none" viewBox="0 0 359 355">
+                    <g filter="url(#f2)">
+                      <ellipse cx="179" cy="178" fill="url(#g2)" rx="79" ry="78" />
+                    </g>
+                    <defs>
+                      <filter
+                        id="f2"
+                        x="0"
+                        y="0"
+                        width="359"
+                        height="355"
+                        filterUnits="userSpaceOnUse"
+                        colorInterpolationFilters="sRGB"
+                      >
+                        <feFlood floodOpacity="0" result="bg" />
+                        <feBlend in="SourceGraphic" in2="bg" mode="normal" result="shape" />
+                        <feGaussianBlur result="blur" stdDeviation="50" />
+                      </filter>
+                      <linearGradient id="g2" x1="179" y1="100" x2="179" y2="255" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#F22FB0" />
+                        <stop offset="1" stopColor="#F58A25" stopOpacity="0" />
+                        <stop offset="1" stopColor="#7061A3" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
+
+              <div className={styles.planetPurple}>
+                <div className={styles.planetPurpleInner}>
+                  <svg className={styles.svgBlock} fill="none" preserveAspectRatio="none" viewBox="0 0 251 249">
+                    <g filter="url(#f3)">
+                      <ellipse cx="126" cy="125" fill="url(#g3)" rx="46" ry="45" />
+                    </g>
+                    <defs>
+                      <filter
+                        id="f3"
+                        x="0"
+                        y="0"
+                        width="251"
+                        height="249"
+                        filterUnits="userSpaceOnUse"
+                        colorInterpolationFilters="sRGB"
+                      >
+                        <feFlood floodOpacity="0" result="bg" />
+                        <feBlend in="SourceGraphic" in2="bg" mode="normal" result="shape" />
+                        <feGaussianBlur result="blur" stdDeviation="40" />
+                      </filter>
+                      <linearGradient id="g3" x1="126" y1="80" x2="126" y2="169" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#7D40FF" />
+                        <stop offset="1" stopColor="#F58A25" stopOpacity="0" />
+                        <stop offset="1" stopColor="#7230FF" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+              </div>
+
+              <div className={styles.textureOverlay} />
+            </div>
           </div>
         </div>
 
-        {/* 中间引用卡片 */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center px-10 pb-6">
-          <div
-            className="rounded-2xl p-8"
-            style={{
-              background: 'rgba(255,255,255,0.13)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(16px)',
-            }}
-          >
-            <p className="text-white text-[26px] font-bold leading-[1.45] mb-5">
-              "视觉智能驱动未来，<br />让每一帧数据都成为<br />AI 进化的力量"
-            </p>
-            <p className="text-white/55 text-[13px]">— OpenVision 愿景</p>
-          </div>
-        </div>
-
-        {/* 底部版权 */}
-        <div className="relative z-10 px-10 pb-8">
-          <p className="text-white/30 text-[12px]">© 2025 OpenVision 版权所有</p>
-        </div>
-      </div>
-
-      {/* ── 右侧表单区 ── */}
-      <div className="flex-1 flex flex-col justify-between items-center py-16 px-8 bg-white">
-        {/* 占位，让表单垂直居中 */}
-        <div />
-
-        <div className="w-full max-w-[380px]">
-          {/* 标题 */}
-          <h2 className="text-gray-900 text-[22px] font-bold text-center mb-8 leading-snug">
-            欢迎使用 OpenVision 视觉智能平台
-          </h2>
-
-          {/* 谷歌登录 */}
-          <button
-            type="button"
-            className="w-full h-12 flex items-center justify-center gap-3 rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap mb-5"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-              <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-              <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-            </svg>
-            <span className="text-gray-600 text-[14px] font-medium">谷歌登录</span>
-          </button>
-
-          {/* 分割线 */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-gray-400 text-[13px]">or</span>
-            <div className="flex-1 h-px bg-gray-100" />
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            {/* 用户名 */}
-            <div>
-              <label className="block text-[13px] text-gray-600 mb-1.5">用户名或邮箱地址</label>
-              <input
-                type="text"
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
-                className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 text-gray-800 placeholder-gray-300 focus:outline-none transition-all bg-white"
-                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#7c3aed';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
-                }}
-              />
+        <div className={styles.rightPanel}>
+          <form className={styles.loginForm} onSubmit={handleLogin}>
+            <div className={styles.header}>
+              <h1>登录 OpenVision</h1>
+              <p>欢迎回来，马上开始新的一天</p>
             </div>
 
-            {/* 密码 */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[13px] text-gray-600">密码</label>
-                <button
-                  type="button"
-                  className="text-[13px] text-violet-600 hover:text-violet-500 cursor-pointer whitespace-nowrap transition-colors"
-                >
-                  忘记密码？
-                </button>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 px-4 pr-11 text-[14px] rounded-full border border-gray-200 text-gray-800 placeholder-gray-300 focus:outline-none transition-all bg-white"
-                  style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#7c3aed';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
-                >
-                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-[15px]`} />
-                </button>
-              </div>
-            </div>
-
-            {/* 错误提示 */}
-            {error && (
-              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-100">
-                <i className="ri-error-warning-line text-red-400 text-[14px]" />
-                <span className="text-[13px] text-red-500">{error}</span>
-              </div>
-            )}
-
-            {/* 登录按钮 */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 text-white text-[15px] font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) e.currentTarget.style.boxShadow = '0 6px 24px rgba(124,58,237,0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,58,237,0.35)';
-              }}
-            >
-              {loading ? (
-                <>
-                  <i className="ri-loader-4-line animate-spin text-[15px]" />
-                  登录中...
-                </>
-              ) : (
-                '登录'
-              )}
+            <button type="button" className={styles.googleBtn}>
+              <GoogleIcon />
+              谷歌登录
             </button>
+
+            <div className={styles.divider}>
+              <div className={styles.dividerLine} />
+              <span>或</span>
+              <div className={styles.dividerLine} />
+            </div>
+
+            <div className={styles.fields}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel} htmlFor="account">
+                  用户名/邮箱
+                </label>
+                <div className={styles.inputWrap}>
+                  <input
+                    id="account"
+                    type="text"
+                    className={styles.input}
+                    placeholder="输入你的用户名或者邮箱"
+                    value={account}
+                    onChange={(event) => setAccount(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <div className={styles.fieldLabelRow}>
+                  <label className={styles.fieldLabel} htmlFor="password">
+                    密码
+                  </label>
+                  <button type="button" className={styles.forgotBtn}>
+                    忘记密码
+                  </button>
+                </div>
+                <div className={styles.inputWrap}>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    className={`${styles.input} ${styles.passwordInput}`}
+                    placeholder="输入你的密码"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className={styles.eyeBtn}
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                  >
+                    <EyeIcon showPassword={showPassword} />
+                  </button>
+                </div>
+              </div>
+
+              {error && <div className={styles.errorText}>{error}</div>}
+
+              <button type="submit" className={styles.loginBtn}>
+                登录
+              </button>
+            </div>
+
+            <div className={styles.signupRow}>
+              <span>还没有账号？</span>
+              <button type="button" className={styles.signupBtn}>
+                马上注册
+              </button>
+            </div>
           </form>
 
-          {/* 注册 */}
-          <p className="text-center text-[13px] text-gray-500 mt-5">
-            还没有账号？
-            <button className="text-violet-600 hover:text-violet-500 cursor-pointer ml-1 whitespace-nowrap transition-colors font-medium">
-              现在注册
-            </button>
-          </p>
+          <div className={styles.copyright}>
+            &copy; 2025 <strong>OpenVision</strong> 版权所有
+          </div>
         </div>
-
-        {/* 底部版权 */}
-        <p className="text-center text-[12px] text-gray-400">
-          © 2025 OpenVision 版权所有
-        </p>
       </div>
     </div>
   );
