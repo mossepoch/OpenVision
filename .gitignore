@@ -33,3 +33,4 @@ openvision.db
 logs/
 backend/openvision.db
 backend/openvision.db.bak
+backend/snapshots/*.jpg

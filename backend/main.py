@@ -2,8 +2,10 @@
 OpenVision Backend - FastAPI Application Entry Point
 """
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -14,6 +16,10 @@ import app.models.device  # noqa
 import app.models.alert   # noqa
 import app.models.user    # noqa
 Base.metadata.create_all(bind=engine)
+
+# 创建快照目录
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
+os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +40,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 静态文件服务：快照截图
+app.mount("/snapshots", StaticFiles(directory=SNAPSHOTS_DIR), name="snapshots")
+
 # 路由
 app.include_router(api_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
 async def auto_reconnect_cameras():
-    """启动时自动重连所有 auto_connect=True 的设备"""
+    """启动时自动重连 auto_connect=True 的设备"""
     try:
         from app.db.database import SessionLocal
         from app.models.device import Device
@@ -57,7 +66,6 @@ async def auto_reconnect_cameras():
             logger.info(f"Auto-reconnecting {len(devices)} camera(s)...")
             for device in devices:
                 camera_service.connect(device.id, device.url, target_fps=device.target_fps or 10)
-                logger.info(f"  Camera {device.id} ({device.name}) → {device.url}")
         else:
             logger.info("No cameras configured for auto-connect.")
     except Exception as e:
