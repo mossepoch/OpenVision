@@ -9,19 +9,31 @@ export interface Alert {
   alert_type: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   message: string;
-  status: 'active' | 'resolved' | 'acknowledged';
+  is_read: boolean;
+  is_resolved: boolean;
   image_path?: string;
   created_at: string;
   resolved_at?: string;
 }
 
-export const alertsApi = {
-  list: (skip = 0, limit = 50) =>
-    api.get<Alert[]>('/api/v1/alerts', { skip, limit }),
+export interface AlertListParams {
+  device_id?: number;
+  is_read?: boolean;
+  severity?: string;
+  skip?: number;
+  limit?: number;
+}
 
-  get: (id: number) =>
-    api.get<Alert>(`/api/v1/alerts/${id}`),
+export const alertsApi = {
+  list: (params?: AlertListParams) =>
+    api.get<Alert[]>('/api/v1/alerts', params as Record<string, string | number>),
 
   create: (data: Partial<Alert>) =>
     api.post<Alert>('/api/v1/alerts', data),
+
+  markRead: (id: number) =>
+    api.put<{ message: string }>(`/api/v1/alerts/${id}/read`),
+
+  resolve: (id: number) =>
+    api.put<{ message: string }>(`/api/v1/alerts/${id}/resolve`),
 };
