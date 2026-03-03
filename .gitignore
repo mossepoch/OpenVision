@@ -36,3 +36,4 @@ backend/openvision.db.bak
 backend/snapshots/*.jpg
 backend/datasets/
 backend/snapshots/
+backend/trained_models/
