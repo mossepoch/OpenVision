@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: openvision-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLite 数据持久化
+      - ./data/db:/app/data
+      # YOLO 模型缓存（避免每次重启重新下载）
+      - ./data/models:/root/.config/Ultralytics
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:////app/data/openvision.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  db_data:
