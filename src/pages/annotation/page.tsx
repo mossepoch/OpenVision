@@ -612,6 +612,8 @@ export default function AnnotationPage() {
           categories={categories}
           onAnnotationsGenerated={handleAIAnnotations}
           onClose={() => setShowAIPanel(false)}
+          datasetName={activeDatasetName ?? undefined}
+          imageFilename={selectedImageId}
         />
       )}
 
