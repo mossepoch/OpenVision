@@ -1,56 +1,57 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { modelsData } from '../../mocks/modelsData';
 import ModelCard from './components/ModelCard';
 import ModelDetailModal from './components/ModelDetailModal';
 import ExportModal from './components/ExportModal';
 import ComparePanel from './components/ComparePanel';
+import { trainingApi, type TrainedModel } from '../../api/training';
 
 export default function ModelsPage() {
+  const [models, setModels] = useState<TrainedModel[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [versionFilter, setVersionFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [downloadedFilter, setDownloadedFilter] = useState('all');
-  const [selectedModel, setSelectedModel] = useState<typeof modelsData[0] | null>(null);
+  const [selectedModel, setSelectedModel] = useState<TrainedModel | null>(null);
   const [exportingModel, setExportingModel] = useState<string | null>(null);
   const [isComparing, setIsComparing] = useState(false);
   const [compareModels, setCompareModels] = useState<string[]>([]);
 
+  useEffect(() => {
+    trainingApi.listModels().then(list => {
+      setModels(list);
+      setLoading(false);
+    }).catch(() => {
+      // fallback
+      setModels([]);
+      setLoading(false);
+    });
+  }, []);
+
   // 筛选模型
   const filteredModels = useMemo(() => {
-    return modelsData.filter((model) => {
-      const matchSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         model.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchVersion = versionFilter === 'all' || model.version === versionFilter;
-      const matchType = typeFilter === 'all' || model.type === typeFilter;
-      const matchSize = sizeFilter === 'all' || model.size === sizeFilter;
+    return models.filter((model) => {
+      const matchSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchDownloaded = downloadedFilter === 'all' || 
-                             (downloadedFilter === 'downloaded' && model.downloaded) ||
-                             (downloadedFilter === 'not-downloaded' && !model.downloaded);
-      
-      return matchSearch && matchVersion && matchType && matchSize && matchDownloaded;
+                             (downloadedFilter === 'downloaded' && !!model.best) ||
+                             (downloadedFilter === 'not-downloaded' && !model.best);
+      return matchSearch && matchDownloaded;
     });
-  }, [searchQuery, versionFilter, typeFilter, sizeFilter, downloadedFilter]);
+  }, [models, searchQuery, downloadedFilter]);
 
   // 统计数据
   const stats = useMemo(() => {
     return {
-      total: modelsData.length,
-      pretrained: modelsData.filter(m => m.type === 'pretrained').length,
-      custom: modelsData.filter(m => m.type === 'custom').length,
-      downloaded: modelsData.filter(m => m.downloaded).length,
-      v8: modelsData.filter(m => m.version === 'v8').length,
-      v11: modelsData.filter(m => m.version === 'v11').length
+      total: models.length,
+      trained: models.filter(m => m.best).length,
+      failed: models.filter(m => !m.best).length,
     };
-  }, []);
-
-  const handleDownload = async (id: string) => {
-    console.log('下载模型:', id);
-    // 模拟下载
-  };
+  }, [models]);
 
   const handleExport = (id: string) => {
-    const model = modelsData.find(m => m.id === id);
+    const model = models.find(m => m.name === id);
     if (model) {
       setExportingModel(model.name);
     }
@@ -71,7 +72,7 @@ export default function ModelsPage() {
     }
   };
 
-  const compareModelsData = modelsData.filter(m => compareModels.includes(m.id));
+  const compareModelsData = models.filter(m => compareModels.includes(m.name));
 
   return (
     <div className="p-6 space-y-5 min-h-full">
