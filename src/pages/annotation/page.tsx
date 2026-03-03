@@ -12,6 +12,7 @@ import {
   MOCK_ANNOTATIONS,
   DEFAULT_CATEGORIES,
 } from '../../mocks/annotationData';
+import { datasetsApi, type Dataset, type YoloLabel } from '../../api/datasets';
 
 type Tool = 'draw' | 'select';
 
@@ -57,6 +58,55 @@ export default function AnnotationPage() {
   // ---------- Images ----------
   const [images, setImages] = useState<AnnotationImage[]>(MOCK_ANNOTATION_IMAGES);
   const [selectedImageId, setSelectedImageId] = useState<string>(MOCK_ANNOTATION_IMAGES[0].id);
+  // 数据集集成
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [activeDatasetId, setActiveDatasetId] = useState<number | null>(null);
+  const [datasetLoading, setDatasetLoading] = useState(false);
+
+  // 加载数据集列表
+  useEffect(() => {
+    datasetsApi.list().then(setDatasets).catch(() => {});
+  }, []);
+
+  // 切换数据集时加载图片
+  useEffect(() => {
+    if (!activeDatasetId) return;
+    setDatasetLoading(true);
+    datasetsApi.listImages(activeDatasetId)
+      .then(imgs => {
+        const annotationImages: AnnotationImage[] = imgs.map(img => ({
+          id: img.id,
+          name: img.filename,
+          url: img.url,
+          annotationCount: img.label_count,
+          status: img.label_count > 0 ? 'labeled' : 'unlabeled',
+        }));
+        setImages(annotationImages);
+        if (annotationImages.length > 0) setSelectedImageId(annotationImages[0].id);
+      })
+      .catch(() => {})
+      .finally(() => setDatasetLoading(false));
+  }, [activeDatasetId]);
+
+  // 保存标注到后端
+  const handleSaveToBackend = useCallback(async () => {
+    if (!activeDatasetId) { showToast('请先选择数据集', 'info'); return; }
+    const anns = allAnnotations[selectedImageId] ?? [];
+    const labels: YoloLabel[] = anns.map(ann => {
+      const catIdx = categories.findIndex(c => c.id === ann.categoryId);
+      return {
+        class_id: catIdx >= 0 ? catIdx : 0,
+        cx: ann.x + ann.width / 2,
+        cy: ann.y + ann.height / 2,
+        w: ann.width,
+        h: ann.height,
+      };
+    });
+    try {
+      await datasetsApi.saveLabels(activeDatasetId, selectedImageId, labels);
+      showToast('标注已保存', 'success');
+    } catch { showToast('保存失败', 'error'); }
+  }, [activeDatasetId, selectedImageId, allAnnotations, categories]);
 
   // ---------- Annotations ----------
   const [allAnnotations, setAllAnnotations] = useState<Record<string, BBox[]>>(() => {
@@ -288,13 +338,23 @@ export default function AnnotationPage() {
         </button>
         <div className="w-px h-5 bg-gray-200"></div>
 
-        {/* Dataset info */}
+        {/* Dataset info + 数据集选择器 */}
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 flex items-center justify-center bg-[#0052d9]/10 rounded">
             <i className="ri-edit-box-line text-[#0052d9] text-[12px]"></i>
           </div>
           <span className="text-[13px] font-semibold text-gray-800">数据标注</span>
-          <span className="text-[11px] text-gray-400">工位装配检测数据集 v2.1</span>
+          <select
+            value={activeDatasetId ?? ''}
+            onChange={e => setActiveDatasetId(e.target.value ? Number(e.target.value) : null)}
+            className="h-7 px-2 text-[12px] border border-gray-200 rounded-lg bg-white text-gray-600 cursor-pointer focus:outline-none focus:border-violet-400"
+          >
+            <option value="">— 使用示例数据 —</option>
+            {datasets.map(d => (
+              <option key={d.id} value={d.id}>{d.name}（{d.image_count}张）</option>
+            ))}
+          </select>
+          {datasetLoading && <span className="text-[11px] text-gray-400">加载中...</span>}
         </div>
 
         <div className="flex-1"></div>
@@ -371,6 +431,16 @@ export default function AnnotationPage() {
           <i className="ri-price-tag-3-line text-[13px]"></i>类别管理
         </button>
 
+        {/* Save to backend */}
+        {activeDatasetId && (
+          <button
+            onClick={handleSaveToBackend}
+            className="h-8 px-3 text-[12px] text-white bg-violet-600 hover:bg-violet-700 rounded-lg flex items-center gap-1.5 cursor-pointer whitespace-nowrap transition-colors"
+          >
+            <i className="ri-save-line text-[13px]"></i>
+            保存标注
+          </button>
+        )}
         {/* Export */}
         <button
           onClick={handleExport}

@@ -7,3 +7,5 @@ export { authApi } from './auth';
 export type { TokenResponse } from './auth';
 export { dashboardApi } from './dashboard';
 export type { DashboardData } from './dashboard';
+export { datasetsApi } from './datasets';
+export type { Dataset, DatasetImage, YoloLabel } from './datasets';
