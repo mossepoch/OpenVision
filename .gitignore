@@ -1,3 +1,11 @@
 openvision-internal/
 PROJECT.md
 *.internal.*
+
+# Backend
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/venv/
+backend/.env
+backend/openvision.db
