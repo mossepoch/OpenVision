@@ -1,11 +1,33 @@
-openvision-internal/
-PROJECT.md
-*.internal.*
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+env/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
 
-# Backend
-backend/__pycache__/
-backend/**/__pycache__/
-backend/**/*.pyc
-backend/venv/
-backend/.env
-backend/openvision.db
+# Database
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+.next/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OpenVision
+openvision.db
+logs/
