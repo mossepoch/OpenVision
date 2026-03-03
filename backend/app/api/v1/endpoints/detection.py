@@ -1,9 +1,11 @@
 """
-YOLO 检测 API + 自动告警写入 + 推送通知
+YOLO 检测 API + 自动告警 + 快照存储 + 推送通知
 """
 import asyncio
 import logging
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, BackgroundTasks
+import os
+import time
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -18,15 +20,45 @@ from app.db.database import get_db
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# 快照存储目录（与 main.py 保持一致）
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "snapshots")
 
-async def _save_and_notify(device_id: int, boxes: list, db: Session) -> list:
-    """保存告警并异步推送通知"""
+
+def _save_snapshot(image_bytes: bytes, device_id: int) -> str:
+    """
+    保存快照到 snapshots/ 目录
+    返回相对 URL: /snapshots/device_1_1234567890.jpg
+    """
+    os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+    filename = f"device_{device_id}_{int(time.time())}.jpg"
+    filepath = os.path.join(SNAPSHOTS_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(image_bytes)
+    return f"/snapshots/{filename}"
+
+
+async def _save_and_notify(
+    device_id: int,
+    boxes: list,
+    db: Session,
+    image_bytes: Optional[bytes] = None,
+) -> list:
+    """保存告警（含快照）并异步推送通知"""
     triggered = check_alert_rules(boxes)
-    alert_ids = []
+    if not triggered:
+        return []
 
-    # 查设备名称（用于通知）
+    alert_ids = []
     device = db.query(Device).filter(Device.id == device_id).first()
     device_name = device.name if device else f"Device {device_id}"
+
+    # 每次触发只存一张快照（所有告警共用同一帧）
+    snapshot_url = None
+    if image_bytes and triggered:
+        try:
+            snapshot_url = _save_snapshot(image_bytes, device_id)
+        except Exception as e:
+            logger.warning(f"Snapshot save failed: {e}")
 
     for rule_hit in triggered:
         alert = Alert(
@@ -35,12 +67,12 @@ async def _save_and_notify(device_id: int, boxes: list, db: Session) -> list:
             severity=rule_hit["severity"],
             message=rule_hit["message"],
             confidence=rule_hit["confidence"],
+            snapshot_url=snapshot_url,
         )
         db.add(alert)
         db.flush()
         alert_ids.append(alert.id)
 
-        # 异步发推送（不等结果，不阻塞）
         asyncio.create_task(
             notification_service.send_alert_notification(
                 device_id=device_id,
@@ -55,14 +87,13 @@ async def _save_and_notify(device_id: int, boxes: list, db: Session) -> list:
 
     if alert_ids:
         db.commit()
-        logger.info(f"Device {device_id}: {len(alert_ids)} alert(s) created, notification queued")
+        logger.info(f"Device {device_id}: {len(alert_ids)} alert(s), snapshot={snapshot_url}")
 
     return alert_ids
 
 
 @router.get("/status")
 async def detection_status():
-    """YOLO 模型状态 + 通知状态"""
     return {
         **detection_service.get_status(),
         "notification": notification_service.get_status(),
@@ -76,13 +107,13 @@ async def detect_snapshot(
     model: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """摄像头快照检测 + 自动告警 + 推送"""
+    """摄像头快照检测 + 告警 + 截图存储"""
     frame = camera_service.get_snapshot(device_id)
     if frame is None:
         raise HTTPException(status_code=404, detail=f"No frame for device {device_id}.")
     try:
         result = detection_service.detect_bytes(frame, conf=conf, model_name=model)
-        alert_ids = await _save_and_notify(device_id, result.boxes, db)
+        alert_ids = await _save_and_notify(device_id, result.boxes, db, image_bytes=frame)
         data = result.to_dict()
         data["alert_ids"] = alert_ids
         data["alerts_triggered"] = len(alert_ids)
@@ -99,7 +130,7 @@ async def detect_upload(
     device_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    """上传图片检测，可选 device_id 触发告警"""
+    """上传图片检测，可选 device_id 触发告警+截图"""
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files supported")
 
@@ -109,7 +140,7 @@ async def detect_upload(
         data = result.to_dict()
 
         if device_id is not None:
-            alert_ids = await _save_and_notify(device_id, result.boxes, db)
+            alert_ids = await _save_and_notify(device_id, result.boxes, db, image_bytes=image_bytes)
             data["alert_ids"] = alert_ids
             data["alerts_triggered"] = len(alert_ids)
         else:
