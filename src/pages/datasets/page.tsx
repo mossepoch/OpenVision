@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { datasetsData } from '../../mocks/datasetsData';
 import DatasetCard from './components/DatasetCard';
 import UploadZone from './components/UploadZone';
 import DatasetDetailModal from './components/DatasetDetailModal';
+import { datasetsApi } from '../../api/datasets';
 
 interface Dataset {
   id: string;
@@ -27,12 +28,44 @@ interface Dataset {
 type FilterStatus = 'all' | 'ready' | 'processing' | 'pending';
 
 export default function DatasetsPage() {
-  const [datasets, setDatasets] = useState<Dataset[]>(datasetsData);
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [viewDataset, setViewDataset] = useState<Dataset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dataset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+
+  // 从后端加载数据集列表
+  useEffect(() => {
+    datasetsApi.list().then(list => {
+      const mapped: Dataset[] = list.map(ds => ({
+        id: ds.name,
+        name: ds.name,
+        description: ds.description,
+        imageCount: ds.image_count,
+        labeledCount: ds.label_count,
+        classCount: ds.labels.length,
+        classes: ds.labels,
+        size: '-',
+        format: 'YOLO',
+        status: ds.image_count > 0 ? 'ready' : 'pending',
+        createdAt: '',
+        updatedAt: '',
+        trainCount: 0,
+        valCount: 0,
+        testCount: 0,
+        tags: [],
+        previewImages: [],
+      }));
+      setDatasets(mapped);
+      setLoading(false);
+    }).catch(() => {
+      // fallback to mock on error
+      setDatasets(datasetsData);
+      setLoading(false);
+    });
+  }, []);
 
   const filtered = datasets.filter(ds => {
     const matchSearch =
@@ -42,32 +75,25 @@ export default function DatasetsPage() {
     return matchSearch && matchStatus;
   });
 
-  const handleUpload = (_file: File) => {
-    // Simulate adding a new dataset after upload
-    const newDs: Dataset = {
-      id: `ds-${Date.now()}`,
-      name: `新上传数据集 ${new Date().toLocaleDateString()}`,
-      description: '刚刚上传的数据集，正在解析 YOLO 格式标注文件...',
-      imageCount: Math.floor(Math.random() * 1000) + 200,
-      labeledCount: 0,
-      classCount: 0,
-      classes: [],
-      size: `${(Math.random() * 500 + 100).toFixed(0)} MB`,
-      format: 'YOLO',
-      status: 'processing',
-      createdAt: new Date().toLocaleString(),
-      updatedAt: new Date().toLocaleString(),
-      trainCount: 0,
-      valCount: 0,
-      testCount: 0,
-      tags: ['新上传'],
-      previewImages: [],
-    };
-    setDatasets(prev => [newDs, ...prev]);
+  const handleUpload = async (_file: File) => {
+    // TODO: 实际应该调用上传 API，这里先模拟创建数据集
+    try {
+      await datasetsApi.create({ name: `ds-${Date.now()}`, description: '新上传', labels: ['person'] });
+      // 重新加载列表
+      const list = await datasetsApi.list();
+      const mapped: Dataset[] = list.map(ds => ({
+        id: ds.name, name: ds.name, description: ds.description,
+        imageCount: ds.image_count, labeledCount: ds.label_count, classCount: ds.labels.length,
+        classes: ds.labels, size: '-', format: 'YOLO', status: ds.image_count > 0 ? 'ready' : 'pending',
+        createdAt: '', updatedAt: '', trainCount: 0, valCount: 0, testCount: 0, tags: [], previewImages: [],
+      }));
+      setDatasets(mapped);
+    } catch (e) { console.error(e); }
     setShowUpload(false);
   };
 
-  const handleDelete = (ds: Dataset) => {
+  const handleDelete = async (ds: Dataset) => {
+    try { await datasetsApi.delete(ds.id); } catch (e) { console.error(e); }
     setDatasets(prev => prev.filter(d => d.id !== ds.id));
     setDeleteTarget(null);
   };
