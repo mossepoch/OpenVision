@@ -33,7 +33,13 @@ export default function AlertsPage() {
     }
   }, [filterSeverity, filterRead]);
 
-  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+  useEffect(() => {
+    fetchAlerts();
+    const timer = setInterval(() => {
+      alertsApi.list({ limit: 100 } as any).then(data => setAlerts(data)).catch(() => {});
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [fetchAlerts]);
 
   const handleMarkRead = async (id: number) => {
     setOperating(id);
