@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import AlertDetailPanel from './components/AlertDetailPanel';
 import { alertsApi, type Alert } from '../../api/alerts';
 
 const SEVERITY_MAP: Record<string, { label: string; bg: string; text: string }> = {
@@ -15,6 +16,7 @@ export default function AlertsPage() {
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [filterRead, setFilterRead] = useState<string>('all');
   const [operating, setOperating] = useState<number | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
@@ -166,7 +168,8 @@ export default function AlertsPage() {
                 return (
                   <tr
                     key={alert.id}
-                    className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${!alert.is_read ? 'bg-violet-50/30' : ''}`}
+                    className={`border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!alert.is_read ? 'bg-violet-50/30' : ''}`}
+                    onClick={() => setSelectedAlert(alert)}
                   >
                     <td className="px-4 py-3 text-[13px] text-gray-400">#{alert.id}</td>
                     <td className="px-4 py-3">
@@ -219,6 +222,17 @@ export default function AlertsPage() {
           </table>
         )}
       </div>
+
+      {selectedAlert && (
+        <AlertDetailPanel
+          alert={selectedAlert}
+          onClose={() => setSelectedAlert(null)}
+          onUpdate={(updated) => {
+            setAlerts(prev => prev.map(a => a.id === updated.id ? updated : a));
+            setSelectedAlert(updated);
+          }}
+        />
+      )}
     </div>
   );
 }
