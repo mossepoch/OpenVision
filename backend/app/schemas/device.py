@@ -42,4 +42,5 @@ class DeviceResponse(DeviceBase):
     updated_at: Optional[datetime] = None
 
     class Config:
+        model_config = {"protected_namespaces": ()}
         from_attributes = True
