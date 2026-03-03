@@ -1,38 +1,23 @@
-"""
-OpenVision Backend - FastAPI Application Entry Point
-"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.core.config import settings
 from app.api.v1.router import api_router
 
 app = FastAPI(
     title="OpenVision API",
-    description="AI + 摄像头智能检测平台后端 API",
-    version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    description="AI+摄像头智能检测平台",
+    version="0.1.0"
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 路由
 app.include_router(api_router, prefix="/api/v1")
 
-
 @app.get("/health")
-async def health_check():
+async def health():
     return {"status": "ok", "service": "OpenVision API"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
