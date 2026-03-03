@@ -1,16 +1,40 @@
 """
-YOLO 检测 API
-- POST /api/v1/detection/snapshot/{device_id}  — 对摄像头当前帧做检测
-- POST /api/v1/detection/upload                 — 上传图片做检测
+YOLO 检测 API + 自动告警写入
+- POST /api/v1/detection/snapshot/{device_id}  — 摄像头快照检测 + 自动告警
+- POST /api/v1/detection/upload                 — 上传图片检测
 - GET  /api/v1/detection/status                 — 模型状态
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.services.detection_service import detection_service
 from app.services.camera_service import camera_service
+from app.services.alert_rules import check_alert_rules
+from app.models.alert import Alert
+from app.db.database import get_db
 
 router = APIRouter()
+
+
+def _save_alerts(device_id: int, boxes: list, db: Session) -> list:
+    """检测结果触发告警并写入数据库"""
+    triggered = check_alert_rules(boxes)
+    alert_ids = []
+    for rule_hit in triggered:
+        alert = Alert(
+            device_id=device_id,
+            alert_type=rule_hit["alert_type"],
+            severity=rule_hit["severity"],
+            message=rule_hit["message"],
+            confidence=rule_hit["confidence"],
+        )
+        db.add(alert)
+        db.flush()
+        alert_ids.append(alert.id)
+    if alert_ids:
+        db.commit()
+    return alert_ids
 
 
 @router.get("/status")
@@ -24,10 +48,11 @@ async def detect_snapshot(
     device_id: int,
     conf: Optional[float] = None,
     model: Optional[str] = None,
+    db: Session = Depends(get_db),
 ):
     """
-    对摄像头当前帧做 YOLO 检测
-    需要先 POST /api/v1/stream/{id}/connect 启动摄像头
+    对摄像头当前帧做 YOLO 检测，触发告警自动写入 Alert 表
+    返回: 检测结果 + alert_ids (触发的告警ID列表)
     """
     frame = camera_service.get_snapshot(device_id)
     if frame is None:
@@ -37,7 +62,11 @@ async def detect_snapshot(
         )
     try:
         result = detection_service.detect_bytes(frame, conf=conf, model_name=model)
-        return result.to_dict()
+        alert_ids = _save_alerts(device_id, result.boxes, db)
+        data = result.to_dict()
+        data["alert_ids"] = alert_ids
+        data["alerts_triggered"] = len(alert_ids)
+        return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Detection failed: {str(e)}")
 
@@ -48,8 +77,8 @@ async def detect_upload(
     conf: Optional[float] = None,
     model: Optional[str] = None,
 ):
-    """上传图片做 YOLO 检测"""
-    if not file.content_type.startswith("image/"):
+    """上传图片做 YOLO 检测（不写告警，仅返回检测结果）"""
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files supported")
 
     image_bytes = await file.read()
