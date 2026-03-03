@@ -26,3 +26,7 @@ class Device(Base):
     detection_enabled = Column(Boolean, default=False)
     model_id = Column(Integer, nullable=True)
     confidence_threshold = Column(Float, default=0.5)
+
+    # 摄像头自动恢复连接
+    auto_connect = Column(Boolean, default=False)   # 启动时自动重连
+    target_fps = Column(Integer, default=10)         # 推流帧率
