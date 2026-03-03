@@ -14,60 +14,23 @@ const TrainingPage = lazy(() => import('../pages/training/page'));
 const ModelsPage = lazy(() => import('../pages/models/page'));
 const NotFound = lazy(() => import('../pages/NotFound'));
 const StationsPage = lazy(() => import('../pages/stations/page'));
+const AlertsPage = lazy(() => import('../pages/alerts/page'));
 
 const routes: RouteObject[] = [
-  {
-    path: '/',
-    element: <LoginPage />
-  },
-  {
-    path: '/home',
-    element: <HomePage />
-  },
-  {
-    path: '/dashboard',
-    element: <DashboardPage />
-  },
-  {
-    path: '/stations',
-    element: <StationsPage />
-  },
-  {
-    path: '/sop-config',
-    element: <SopConfigPage />
-  },
-  {
-    path: '/monitoring',
-    element: <MonitoringPage />
-  },
-  {
-    path: '/devices',
-    element: <DevicesPage />
-  },
-  {
-    path: '/reports',
-    element: <ReportsPage />
-  },
-  {
-    path: '/datasets',
-    element: <DatasetsPage />
-  },
-  {
-    path: '/annotation',
-    element: <AnnotationPage />
-  },
-  {
-    path: '/training',
-    element: <TrainingPage />
-  },
-  {
-    path: '/models',
-    element: <ModelsPage />
-  },
-  {
-    path: '*',
-    element: <NotFound />
-  }
+  { path: '/', element: <LoginPage /> },
+  { path: '/home', element: <HomePage /> },
+  { path: '/dashboard', element: <DashboardPage /> },
+  { path: '/stations', element: <StationsPage /> },
+  { path: '/sop-config', element: <SopConfigPage /> },
+  { path: '/monitoring', element: <MonitoringPage /> },
+  { path: '/devices', element: <DevicesPage /> },
+  { path: '/alerts', element: <AlertsPage /> },
+  { path: '/reports', element: <ReportsPage /> },
+  { path: '/datasets', element: <DatasetsPage /> },
+  { path: '/annotation', element: <AnnotationPage /> },
+  { path: '/training', element: <TrainingPage /> },
+  { path: '/models', element: <ModelsPage /> },
+  { path: '*', element: <NotFound /> },
 ];
 
 export default routes;
