@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authApi } from '../../api/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!account.trim() || !password.trim()) {
@@ -17,10 +18,16 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const result = await authApi.login(account.trim(), password);
+      localStorage.setItem('access_token', result.access_token);
+      localStorage.setItem('user', JSON.stringify(result.user));
       navigate('/dashboard');
-    }, 800);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '登录失败，请重试');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,7 +42,6 @@ export default function LoginPage() {
           background: 'linear-gradient(160deg, #a78bfa 0%, #7c3aed 45%, #6d28d9 100%)',
         }}
       >
-        {/* 光晕 */}
         <div
           className="absolute top-[-100px] left-[-60px] w-[380px] h-[380px] rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(196,167,255,0.45) 0%, transparent 65%)' }}
@@ -44,7 +50,6 @@ export default function LoginPage() {
           className="absolute bottom-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 65%)' }}
         />
-        {/* 点阵纹理 */}
         <div
           className="absolute inset-0 opacity-[0.08] pointer-events-none"
           style={{
@@ -52,16 +57,12 @@ export default function LoginPage() {
             backgroundSize: '28px 28px',
           }}
         />
-
-        {/* Logo */}
         <div className="relative z-10 px-10 pt-10 flex items-center gap-2.5">
           <div className="flex items-center gap-1.5">
             <span className="text-white/80 text-[13px] tracking-widest font-semibold">···</span>
             <span className="text-white text-[17px] font-bold tracking-wide">OpenVision</span>
           </div>
         </div>
-
-        {/* 中间引用卡片 */}
         <div className="relative z-10 flex-1 flex flex-col justify-center px-10 pb-6">
           <div
             className="rounded-2xl p-8"
@@ -77,8 +78,6 @@ export default function LoginPage() {
             <p className="text-white/55 text-[13px]">— OpenVision 愿景</p>
           </div>
         </div>
-
-        {/* 底部版权 */}
         <div className="relative z-10 px-10 pb-8">
           <p className="text-white/30 text-[12px]">© 2025 OpenVision 版权所有</p>
         </div>
@@ -86,16 +85,12 @@ export default function LoginPage() {
 
       {/* ── 右侧表单区 ── */}
       <div className="flex-1 flex flex-col justify-between items-center py-16 px-8 bg-white">
-        {/* 占位，让表单垂直居中 */}
         <div />
-
         <div className="w-full max-w-[380px]">
-          {/* 标题 */}
           <h2 className="text-gray-900 text-[22px] font-bold text-center mb-8 leading-snug">
             欢迎使用 OpenVision 视觉智能平台
           </h2>
 
-          {/* 谷歌登录 */}
           <button
             type="button"
             className="w-full h-12 flex items-center justify-center gap-3 rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap mb-5"
@@ -110,7 +105,6 @@ export default function LoginPage() {
             <span className="text-gray-600 text-[14px] font-medium">谷歌登录</span>
           </button>
 
-          {/* 分割线 */}
           <div className="flex items-center gap-3 mb-5">
             <div className="flex-1 h-px bg-gray-100" />
             <span className="text-gray-400 text-[13px]">or</span>
@@ -118,13 +112,13 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* 用户名 */}
             <div>
               <label className="block text-[13px] text-gray-600 mb-1.5">用户名或邮箱地址</label>
               <input
                 type="text"
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
+                placeholder="admin"
                 className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 text-gray-800 placeholder-gray-300 focus:outline-none transition-all bg-white"
                 style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
                 onFocus={(e) => {
@@ -138,7 +132,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* 密码 */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[13px] text-gray-600">密码</label>
@@ -170,20 +163,17 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
                 >
-                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-[15px]`} />
+                  {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
             </div>
 
-            {/* 错误提示 */}
             {error && (
               <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-100">
-                <i className="ri-error-warning-line text-red-400 text-[14px]" />
-                <span className="text-[13px] text-red-500">{error}</span>
+                <span className="text-[13px] text-red-500">⚠ {error}</span>
               </div>
             )}
 
-            {/* 登录按钮 */}
             <button
               type="submit"
               disabled={loading}
@@ -192,25 +182,11 @@ export default function LoginPage() {
                 background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
                 boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
               }}
-              onMouseEnter={(e) => {
-                if (!loading) e.currentTarget.style.boxShadow = '0 6px 24px rgba(124,58,237,0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,58,237,0.35)';
-              }}
             >
-              {loading ? (
-                <>
-                  <i className="ri-loader-4-line animate-spin text-[15px]" />
-                  登录中...
-                </>
-              ) : (
-                '登录'
-              )}
+              {loading ? '登录中...' : '登录'}
             </button>
           </form>
 
-          {/* 注册 */}
           <p className="text-center text-[13px] text-gray-500 mt-5">
             还没有账号？
             <button className="text-violet-600 hover:text-violet-500 cursor-pointer ml-1 whitespace-nowrap transition-colors font-medium">
@@ -218,11 +194,7 @@ export default function LoginPage() {
             </button>
           </p>
         </div>
-
-        {/* 底部版权 */}
-        <p className="text-center text-[12px] text-gray-400">
-          © 2025 OpenVision 版权所有
-        </p>
+        <p className="text-center text-[12px] text-gray-400">© 2025 OpenVision 版权所有</p>
       </div>
     </div>
   );
