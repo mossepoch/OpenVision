@@ -18,6 +18,7 @@ const AlertsPage = lazy(() => import('../pages/alerts/page'));
 
 const routes: RouteObject[] = [
   { path: '/', element: <LoginPage /> },
+  { path: '/login', element: <LoginPage /> },
   { path: '/home', element: <HomePage /> },
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/stations', element: <StationsPage /> },
