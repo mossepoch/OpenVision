@@ -11,11 +11,14 @@ from app.core.config import settings
 from app.api.v1.router import api_router
 from app.db.database import engine, Base
 
-# 自动创建数据库表
-import app.models.device  # noqa
-import app.models.alert   # noqa
-import app.models.user    # noqa
-Base.metadata.create_all(bind=engine)
+# 自动创建数据库表（测试环境跳过）
+TESTING = os.getenv("TESTING", False)
+
+if not TESTING:
+    import app.models.device  # noqa
+    import app.models.alert   # noqa
+    import app.models.user    # noqa
+    Base.metadata.create_all(bind=engine)
 
 # 创建快照目录
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
