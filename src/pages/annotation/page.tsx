@@ -58,10 +58,11 @@ export default function AnnotationPage() {
   // ---------- Images ----------
   const [images, setImages] = useState<AnnotationImage[]>(MOCK_ANNOTATION_IMAGES);
   const [selectedImageId, setSelectedImageId] = useState<string>(MOCK_ANNOTATION_IMAGES[0].id);
-  // 数据集集成
+  // 数据集集成（用 name 作为标识）
   const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [activeDatasetId, setActiveDatasetId] = useState<number | null>(null);
+  const [activeDatasetName, setActiveDatasetName] = useState<string | null>(null);
   const [datasetLoading, setDatasetLoading] = useState(false);
+  const [activeDatasetLabels, setActiveDatasetLabels] = useState<string[]>([]);
 
   // 加载数据集列表
   useEffect(() => {
@@ -70,28 +71,31 @@ export default function AnnotationPage() {
 
   // 切换数据集时加载图片
   useEffect(() => {
-    if (!activeDatasetId) return;
+    if (!activeDatasetName) return;
     setDatasetLoading(true);
-    datasetsApi.listImages(activeDatasetId)
-      .then(imgs => {
-        const annotationImages: AnnotationImage[] = imgs.map(img => ({
-          id: img.id,
+    const ds = datasets.find(d => d.name === activeDatasetName);
+    if (ds?.labels) setActiveDatasetLabels(ds.labels);
+    datasetsApi.listImages(activeDatasetName)
+      .then(res => {
+        const annotationImages: AnnotationImage[] = res.images.map(img => ({
+          id: img.filename,
           name: img.filename,
-          url: img.url,
-          annotationCount: img.label_count,
-          status: img.label_count > 0 ? 'labeled' : 'unlabeled',
+          url: img.url.startsWith('http') ? img.url : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${img.url}`,
+          annotationCount: img.has_labels ? 1 : 0,
+          status: img.has_labels ? 'labeled' : 'unlabeled',
         }));
-        setImages(annotationImages);
+        setImages(annotationImages.length > 0 ? annotationImages : MOCK_ANNOTATION_IMAGES);
         if (annotationImages.length > 0) setSelectedImageId(annotationImages[0].id);
       })
       .catch(() => {})
       .finally(() => setDatasetLoading(false));
-  }, [activeDatasetId]);
+  }, [activeDatasetName, datasets]);
 
   // 保存标注到后端
   const handleSaveToBackend = useCallback(async () => {
-    if (!activeDatasetId) { showToast('请先选择数据集', 'info'); return; }
+    if (!activeDatasetName) { showToast('请先选择数据集', 'info'); return; }
     const anns = allAnnotations[selectedImageId] ?? [];
+    const labelsList = activeDatasetLabels.length > 0 ? activeDatasetLabels : categories.map(c => c.name);
     const labels: YoloLabel[] = anns.map(ann => {
       const catIdx = categories.findIndex(c => c.id === ann.categoryId);
       return {
@@ -103,10 +107,14 @@ export default function AnnotationPage() {
       };
     });
     try {
-      await datasetsApi.saveLabels(activeDatasetId, selectedImageId, labels);
-      showToast('标注已保存', 'success');
+      await datasetsApi.saveLabels(activeDatasetName, selectedImageId, labels);
+      showToast(`已保存 ${labels.length} 条标注`, 'success');
+      // 更新图片状态
+      setImages(prev => prev.map(img =>
+        img.id === selectedImageId ? { ...img, annotationCount: labels.length, status: labels.length > 0 ? 'labeled' : 'unlabeled' } : img
+      ));
     } catch { showToast('保存失败', 'error'); }
-  }, [activeDatasetId, selectedImageId, allAnnotations, categories]);
+  }, [activeDatasetName, selectedImageId, allAnnotations, categories, activeDatasetLabels]);
 
   // ---------- Annotations ----------
   const [allAnnotations, setAllAnnotations] = useState<Record<string, BBox[]>>(() => {
@@ -345,8 +353,8 @@ export default function AnnotationPage() {
           </div>
           <span className="text-[13px] font-semibold text-gray-800">数据标注</span>
           <select
-            value={activeDatasetId ?? ''}
-            onChange={e => setActiveDatasetId(e.target.value ? Number(e.target.value) : null)}
+            value={activeDatasetName ?? ''}
+            onChange={e => setActiveDatasetName(e.target.value || null)}
             className="h-7 px-2 text-[12px] border border-gray-200 rounded-lg bg-white text-gray-600 cursor-pointer focus:outline-none focus:border-violet-400"
           >
             <option value="">— 使用示例数据 —</option>
@@ -432,7 +440,7 @@ export default function AnnotationPage() {
         </button>
 
         {/* Save to backend */}
-        {activeDatasetId && (
+        {activeDatasetName && (
           <button
             onClick={handleSaveToBackend}
             className="h-8 px-3 text-[12px] text-white bg-violet-600 hover:bg-violet-700 rounded-lg flex items-center gap-1.5 cursor-pointer whitespace-nowrap transition-colors"

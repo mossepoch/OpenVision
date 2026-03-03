@@ -1,55 +1,80 @@
 /**
  * 数据集 + 标注 API
+ * 对齐二牛后端接口（用 name 作为 id，不是数字）
  */
-import { api } from './client';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    ...options,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export interface Dataset {
-  id: number;
   name: string;
   description?: string;
+  labels: string[];       // 类别标签列表
   image_count: number;
-  labeled_count: number;
-  created_at: string;
+  label_count: number;
 }
 
 export interface DatasetImage {
-  id: string;          // 文件名（无扩展名）或 UUID
   filename: string;
-  url: string;         // 可访问的图片 URL
-  label_count: number;
-  created_at?: string;
+  url: string;            // 可访问的图片 URL（含 API_BASE）
+  has_labels: boolean;
 }
 
 export interface YoloLabel {
   class_id: number;
-  cx: number;   // 中心 x（归一化 0-1）
-  cy: number;   // 中心 y（归一化 0-1）
-  w: number;    // 宽（归一化）
-  h: number;    // 高（归一化）
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
 }
 
 export const datasetsApi = {
-  list: () => api.get<Dataset[]>('/api/v1/datasets/'),
+  list: () => apiRequest<Dataset[]>('/api/v1/datasets/'),
 
-  create: (name: string, description?: string) =>
-    api.post<Dataset>('/api/v1/datasets/', { name, description }),
+  create: (name: string, description?: string, labels?: string[]) =>
+    apiRequest<Dataset>('/api/v1/datasets/', {
+      method: 'POST',
+      body: JSON.stringify({ name, description, labels: labels ?? ['person', 'car', 'fire', 'knife'] }),
+    }),
 
-  uploadImage: (datasetId: number, file: File) => {
+  listImages: (datasetName: string) =>
+    apiRequest<{ dataset: string; images: DatasetImage[]; count: number }>(
+      `/api/v1/datasets/${datasetName}/images`
+    ),
+
+  uploadImage: async (datasetName: string, file: File): Promise<DatasetImage> => {
     const formData = new FormData();
     formData.append('file', file);
-    const token = localStorage.getItem('access_token');
-    return fetch(
-      `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/datasets/${datasetId}/images`,
-      { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: formData }
-    ).then(r => r.json()) as Promise<DatasetImage>;
+    const res = await fetch(`${API_BASE}/api/v1/datasets/${datasetName}/images`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
   },
 
-  listImages: (datasetId: number) =>
-    api.get<DatasetImage[]>(`/api/v1/datasets/${datasetId}/images`),
+  getLabels: (datasetName: string, imgFilename: string) =>
+    apiRequest<{ image: string; labels: YoloLabel[]; count: number }>(
+      `/api/v1/datasets/${datasetName}/labels/${imgFilename}`
+    ),
 
-  getLabels: (datasetId: number, imgId: string) =>
-    api.get<YoloLabel[]>(`/api/v1/datasets/${datasetId}/images/${imgId}/labels`),
-
-  saveLabels: (datasetId: number, imgId: string, labels: YoloLabel[]) =>
-    api.post<{ message: string }>(`/api/v1/datasets/${datasetId}/images/${imgId}/labels`, labels),
+  saveLabels: (datasetName: string, imgFilename: string, labels: YoloLabel[]) =>
+    apiRequest<{ message: string; count: number }>(
+      `/api/v1/datasets/${datasetName}/labels/${imgFilename}`,
+      { method: 'POST', body: JSON.stringify(labels) }
+    ),
 };
