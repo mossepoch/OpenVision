@@ -11,6 +11,7 @@ from app.db.database import engine, Base
 # 自动创建数据库表
 import app.models.device  # noqa
 import app.models.alert   # noqa
+import app.models.user    # noqa
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
