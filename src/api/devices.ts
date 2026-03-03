@@ -46,13 +46,13 @@ export interface DeviceUpdate {
 
 export const devicesApi = {
   list: (skip = 0, limit = 100) =>
-    api.get<Device[]>('/api/v1/devices', { skip, limit }),
+    api.get<Device[]>('/api/v1/devices/', { skip, limit }),
 
   get: (id: number) =>
     api.get<Device>(`/api/v1/devices/${id}`),
 
   create: (data: DeviceCreate) =>
-    api.post<Device>('/api/v1/devices', data),
+    api.post<Device>('/api/v1/devices/', data),
 
   update: (id: number, data: DeviceUpdate) =>
     api.put<Device>(`/api/v1/devices/${id}`, data),
