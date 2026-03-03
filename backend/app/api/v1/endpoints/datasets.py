@@ -127,3 +127,85 @@ def get_labels(name: str, filename: str):
         return {"labels": []}
     lines = [l for l in label_path.read_text().splitlines() if l.strip()]
     return {"labels": lines}
+
+
+@router.post("/{name}/images/{filename}/auto-label")
+def auto_label(name: str, filename: str, confidence: float = 0.25):
+    """
+    AI 一键标注：对数据集中指定图片运行 YOLO 检测，
+    自动生成 YOLO 格式标注并保存到 labels 目录。
+    """
+    import json
+    from ultralytics import YOLO
+
+    image_path = DATASETS_DIR / name / "images" / filename
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # 读取数据集类别配置
+    meta_file = DATASETS_DIR / name / "meta.json"
+    meta = json.loads(meta_file.read_text()) if meta_file.exists() else {}
+    dataset_labels = meta.get("labels", ["person", "car", "fire", "knife"])
+
+    # YOLO 检测
+    model = YOLO("yolov8n.pt")
+    results = model(str(image_path), conf=confidence, verbose=False)
+
+    # 转换为 YOLO 格式标注
+    yolo_lines = []
+    detected = []
+    for r in results:
+        img_w, img_h = r.orig_shape[1], r.orig_shape[0]
+        for box in r.boxes:
+            cls_name = r.names[int(box.cls)]
+            # 只保留数据集类别中存在的类别
+            if cls_name in dataset_labels:
+                class_id = dataset_labels.index(cls_name)
+            else:
+                # 不在数据集类别中的也保留，用原始class_id
+                class_id = int(box.cls)
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            cx = (x1 + x2) / 2 / img_w
+            cy = (y1 + y2) / 2 / img_h
+            w = (x2 - x1) / img_w
+            h = (y2 - y1) / img_h
+            yolo_lines.append(f"{class_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
+            detected.append({"label": cls_name, "confidence": round(float(box.conf), 3)})
+
+    # 保存标注
+    stem = Path(filename).stem
+    label_path = DATASETS_DIR / name / "labels" / f"{stem}.txt"
+    label_path.parent.mkdir(exist_ok=True)
+    label_path.write_text("\n".join(yolo_lines))
+
+    return {
+        "filename": filename,
+        "detected": len(yolo_lines),
+        "labels": yolo_lines,
+        "objects": detected,
+    }
+
+
+@router.post("/{name}/auto-label-all")
+def auto_label_all(name: str, confidence: float = 0.25):
+    """对数据集所有图片执行 AI 一键标注"""
+    images_dir = DATASETS_DIR / name / "images"
+    if not images_dir.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    exts = {".jpg", ".jpeg", ".png", ".bmp"}
+    images = [f.name for f in images_dir.iterdir() if f.suffix.lower() in exts]
+
+    results = []
+    for img in images:
+        try:
+            r = auto_label(name, img, confidence)
+            results.append({"image": img, "detected": r["detected"], "ok": True})
+        except Exception as e:
+            results.append({"image": img, "detected": 0, "ok": False, "error": str(e)})
+
+    return {
+        "total": len(images),
+        "labeled": sum(1 for r in results if r["ok"]),
+        "results": results,
+    }
