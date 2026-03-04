@@ -1,4 +1,17 @@
-import apiClient from './client';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function req<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export interface ReportSummary {
   range: string;
@@ -24,9 +37,9 @@ export interface DeviceStat {
 
 export const reportsApi = {
   summary: (range: 'today' | 'week' | 'month' = 'today') =>
-    apiClient.get<ReportSummary>(`/reports/summary?range=${range}`).then(r => r.data),
+    req<ReportSummary>(`/reports/summary?range=${range}`),
   trend: (days = 7) =>
-    apiClient.get<TrendPoint[]>(`/reports/trend?days=${days}`).then(r => r.data),
+    req<TrendPoint[]>(`/reports/trend?days=${days}`),
   deviceStats: () =>
-    apiClient.get<DeviceStat[]>('/reports/device-stats').then(r => r.data),
+    req<DeviceStat[]>('/reports/device-stats'),
 };
