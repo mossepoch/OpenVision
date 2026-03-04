@@ -32,6 +32,10 @@ async def get_dashboard(db: Session = Depends(get_db)):
     # 最近告警
     recent_alerts = db.query(Alert).order_by(Alert.created_at.desc()).limit(5).all()
 
+    # 已处理告警数
+    resolved_alerts = db.query(func.count(Alert.id)).filter(Alert.is_resolved == True).scalar() or 0
+    compliance_rate = round(resolved_alerts / total_alerts * 100, 1) if total_alerts > 0 else 100.0
+
     return {
         "devices": {
             "total": total_devices,
@@ -43,7 +47,10 @@ async def get_dashboard(db: Session = Depends(get_db)):
             "total": total_alerts,
             "unread": unread_alerts,
             "critical": critical_alerts,
+            "resolved": resolved_alerts,
         },
+        "compliance_rate": compliance_rate,
+        "running_detections": online_devices,  # 在线设备数即为运行检测数
         "recent_alerts": [
             {
                 "id": a.id,
