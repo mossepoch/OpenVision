@@ -44,11 +44,14 @@ export interface YoloLabel {
 export const datasetsApi = {
   list: () => apiRequest<Dataset[]>('/api/v1/datasets/'),
 
-  create: (name: string, description?: string, labels?: string[]) =>
+  create: (data: { name: string; description?: string; labels?: string[] }) =>
     apiRequest<Dataset>('/api/v1/datasets/', {
       method: 'POST',
-      body: JSON.stringify({ name, description, labels: labels ?? ['person', 'car', 'fire', 'knife'] }),
+      body: JSON.stringify({ ...data, labels: data.labels ?? ['person', 'car', 'fire', 'knife'] }),
     }),
+
+  delete: (name: string) =>
+    apiRequest<{ message: string }>(`/api/v1/datasets/${name}`, { method: 'DELETE' }),
 
   listImages: (datasetName: string) =>
     apiRequest<{ dataset: string; images: DatasetImage[]; count: number }>(
