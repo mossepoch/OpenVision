@@ -91,11 +91,23 @@ async def upload_image(name: str, file: UploadFile = File(...)):
 @router.get("/{name}/images")
 def list_images(name: str):
     images_dir = DATASETS_DIR / name / "images"
+    labels_dir = DATASETS_DIR / name / "labels"
     if not images_dir.exists():
         raise HTTPException(status_code=404, detail="Dataset not found")
     exts = {".jpg", ".jpeg", ".png", ".bmp"}
-    files = [f.name for f in images_dir.iterdir() if f.suffix.lower() in exts]
-    return {"dataset": name, "images": sorted(files), "count": len(files)}
+    files = sorted([f.name for f in images_dir.iterdir() if f.suffix.lower() in exts])
+    # 返回结构化对象，包含标注状态
+    images_info = []
+    for fname in files:
+        stem = Path(fname).stem
+        label_file = labels_dir / f"{stem}.txt"
+        has_labels = label_file.exists() and label_file.stat().st_size > 0
+        images_info.append({
+            "filename": fname,
+            "url": f"/dataset-files/{name}/images/{fname}",
+            "has_labels": has_labels,
+        })
+    return {"dataset": name, "images": images_info, "count": len(images_info)}
 
 
 @router.get("/{name}/images/{filename}")
