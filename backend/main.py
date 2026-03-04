@@ -20,9 +20,11 @@ if not TESTING:
     import app.models.user    # noqa
     Base.metadata.create_all(bind=engine)
 
-# 创建快照目录
+# 创建快照目录 + 数据集目录
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
+DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
 os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+os.makedirs(DATASETS_DIR, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +45,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 静态文件服务：快照截图
+# 静态文件服务：快照截图 + 数据集图片
 app.mount("/snapshots", StaticFiles(directory=SNAPSHOTS_DIR), name="snapshots")
+app.mount("/dataset-files", StaticFiles(directory=DATASETS_DIR), name="datasets")
 
 # 路由
 app.include_router(api_router, prefix="/api/v1")
