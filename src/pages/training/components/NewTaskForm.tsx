@@ -1,7 +1,6 @@
 
-import { useState } from 'react';
-import { datasetsData } from '../../../mocks/datasetsData';
-import { availableModels } from '../../../mocks/trainingData';
+import { useState, useEffect } from 'react';
+import { datasetsApi, Dataset } from '../../../api/datasets';
 
 interface NewTaskFormProps {
   onClose: () => void;
@@ -24,13 +23,16 @@ const optimizers = ['SGD', 'AdamW', 'Adam', 'RMSProp'];
 const batchSizes = [8, 16, 32, 64, 128];
 const imgSizes = [320, 416, 512, 640, 1280];
 
+const availableModels = ['yolov8n.pt', 'yolov8s.pt', 'yolov8m.pt', 'yolov8l.pt', 'yolov8x.pt'];
+
 export default function NewTaskForm({ onClose, onSubmit }: NewTaskFormProps) {
-  const readyDatasets = datasetsData.filter(d => d.status === 'ready');
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  useEffect(() => { datasetsApi.list().then(setDatasets).catch(console.error); }, []);
 
   const [form, setForm] = useState<NewTaskPayload>({
     name: '',
-    datasetId: readyDatasets[0]?.id ?? '',
-    datasetName: readyDatasets[0]?.name ?? '',
+    datasetId: '',
+    datasetName: '',
     baseModel: 'yolov8m.pt',
     epochs: 100,
     batchSize: 16,
@@ -64,9 +66,11 @@ export default function NewTaskForm({ onClose, onSubmit }: NewTaskFormProps) {
     onSubmit(form);
   };
 
-  const selectedModel = availableModels.find(m => m.id === form.baseModel);
-  const yolov8 = availableModels.filter(m => m.series === 'YOLOv8');
-  const yolov11 = availableModels.filter(m => m.series === 'YOLOv11');
+  // 数据集选择时同步 name
+  const handleDatasetChange = (name: string) => {
+    set('datasetId', name);
+    set('datasetName', name);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -111,11 +115,11 @@ export default function NewTaskForm({ onClose, onSubmit }: NewTaskFormProps) {
               训练数据集 <span className="text-red-400">*</span>
             </label>
             <div className="space-y-2">
-              {readyDatasets.map(ds => (
+              {datasets.map(ds => (
                 <label
-                  key={ds.id}
+                  key={ds.name}
                   className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                    form.datasetId === ds.id
+                    form.datasetId === ds.name
                       ? 'border-[#0052d9]/40 bg-[#0052d9]/4'
                       : 'border-[#f0f1f3] hover:border-gray-200'
                   }`}
@@ -123,18 +127,15 @@ export default function NewTaskForm({ onClose, onSubmit }: NewTaskFormProps) {
                   <input
                     type="radio"
                     name="dataset"
-                    value={ds.id}
-                    checked={form.datasetId === ds.id}
-                    onChange={() => {
-                      set('datasetId', ds.id);
-                      set('datasetName', ds.name);
-                    }}
+                    value={ds.name}
+                    checked={form.datasetId === ds.name}
+                    onChange={() => handleDatasetChange(ds.name)}
                     className="accent-[#0052d9]"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-medium text-gray-800 truncate">{ds.name}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">
-                      {ds.imageCount.toLocaleString()} 张图片 · {ds.classCount} 个类别 · {ds.size}
+                      {ds.image_count} 张图片 · {ds.labels?.length ?? 0} 个类别
                     </p>
                   </div>
                   <span className="text-[10px] text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full whitespace-nowrap">
@@ -142,9 +143,9 @@ export default function NewTaskForm({ onClose, onSubmit }: NewTaskFormProps) {
                   </span>
                 </label>
               ))}
-              {readyDatasets.length === 0 && (
+              {datasets.length === 0 && (
                 <div className="text-[12px] text-gray-400 text-center py-4">
-                  暂无就绪数据集，请先上传并标注数据集
+                  暂无数据集，请先上传并标注数据集
                 </div>
               )}
             </div>
@@ -154,34 +155,26 @@ export default function NewTaskForm({ onClose, onSubmit }: NewTaskFormProps) {
           <div>
             <label className="block text-[12px] font-medium text-gray-700 mb-1.5">基础模型</label>
             <div className="space-y-2">
-              {[{ label: 'YOLOv8 系列', models: yolov8 }, { label: 'YOLOv11 系列', models: yolov11 }].map(group => (
-                <div key={group.label}>
-                  <p className="text-[10px] text-gray-400 mb-1.5 font-medium">{group.label}</p>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {group.models.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => set('baseModel', m.id)}
-                        className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
-                          form.baseModel === m.id
-                            ? 'border-[#0052d9]/40 bg-[#0052d9]/8 text-[#0052d9]'
-                            : 'border-[#f0f1f3] hover:border-gray-200 text-gray-600'
-                        }`}
-                      >
-                        <div className="text-[11px] font-semibold">{m.name}</div>
-                        <div className="text-[9px] text-gray-400 mt-0.5">{m.speed}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <div className="grid grid-cols-5 gap-1.5">
+                {availableModels.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => set('baseModel', m)}
+                    className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                      form.baseModel === m
+                        ? 'border-[#0052d9]/40 bg-[#0052d9]/8 text-[#0052d9]'
+                        : 'border-[#f0f1f3] hover:border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    <div className="text-[11px] font-semibold">{m.replace('.pt', '')}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-            {selectedModel && (
+            {form.baseModel && (
               <div className="mt-2 flex items-center gap-3 bg-[#f8f9fa] rounded-lg px-3 py-2">
                 <i className="ri-information-line text-gray-400 text-[13px]"></i>
-                <span className="text-[10.5px] text-gray-500">
-                  {selectedModel.name} · {selectedModel.params} 参数 · {selectedModel.size} · 推理速度：{selectedModel.speed}
-                </span>
+                <span className="text-[10.5px] text-gray-500">已选: {form.baseModel}</span>
               </div>
             )}
           </div>
