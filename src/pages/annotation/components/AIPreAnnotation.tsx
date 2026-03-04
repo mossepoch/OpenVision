@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { YOLO_CLASSES } from '../../../mocks/annotationData';
 import { BBox } from './AnnotationCanvas';
 import { Category } from './CategoryManager';
-import apiClient from '../../../api/client';
+import { api as apiClient } from '../../../api/client';
 
 interface AIPreAnnotationProps {
   categories: Category[];
@@ -46,13 +46,11 @@ export default function AIPreAnnotation({
       // 有真实数据集和图片时调用后端 API
       if (datasetName && imageFilename) {
         setProgress(30);
-        const res = await apiClient.post(
-          `/datasets/${datasetName}/images/${imageFilename}/auto-label`,
-          null,
-          { params: { confidence } }
+        const result = await apiClient.post<{ labels: string[]; count: number }>(
+          `/api/v1/datasets/${datasetName}/images/${imageFilename}/auto-label?confidence=${confidence}`,
         );
         setProgress(90);
-        const { labels } = res.data as { labels: string[] };
+        const { labels } = result;
 
         // 将 YOLO 格式标注转换为 BBox
         const generated: BBox[] = labels.map((line, i) => {
