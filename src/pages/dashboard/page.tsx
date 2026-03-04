@@ -25,9 +25,9 @@ export default function Dashboard() {
     ? {
         onlineDevices: apiData.devices.online,
         totalDevices: apiData.devices.total,
-        runningTasks: dashboardData.stats.runningTasks, // 后端还没这个，暂时 mock
+        runningTasks: apiData.running_detections ?? dashboardData.stats.runningTasks,
         pendingAlerts: apiData.alerts.unread,
-        avgCompliance: dashboardData.stats.avgCompliance, // 后端还没这个，暂时 mock
+        avgCompliance: apiData.compliance_rate ?? dashboardData.stats.avgCompliance,
       }
     : dashboardData.stats;
 
