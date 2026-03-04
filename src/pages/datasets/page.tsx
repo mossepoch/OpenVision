@@ -78,7 +78,7 @@ export default function DatasetsPage() {
   const handleUpload = async (_file: File) => {
     // TODO: 实际应该调用上传 API，这里先模拟创建数据集
     try {
-      await datasetsApi.create({ name: `ds-${Date.now()}`, description: '新上传', labels: ['person'] });
+      await datasetsApi.create({ name: `ds-${Date.now()}`, description: '新上传数据集', labels: ['person', 'car', 'fire', 'knife'] });
       // 重新加载列表
       const list = await datasetsApi.list();
       const mapped: Dataset[] = list.map(ds => ({
