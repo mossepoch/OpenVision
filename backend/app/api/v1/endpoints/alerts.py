@@ -53,6 +53,40 @@ async def mark_read(alert_id: int, db: Session = Depends(get_db)):
     return {"message": "已标记已读"}
 
 
+@router.post("/test-notify")
+async def test_notify(channel: str = "all"):
+    """发送测试推送通知，验证邮件/飞书配置是否正常"""
+    from app.services.notification_service import NotificationService
+    from app.models.alert import Alert
+    from datetime import datetime
+
+    # 构造一个测试告警对象
+    class FakeAlert:
+        id = 0
+        device_id = 999
+        alert_type = "test"
+        severity = "info"
+        message = "这是一条测试推送通知，请忽略。"
+        snapshot_url = None
+        created_at = datetime.now()
+
+    svc = NotificationService()
+    results = {}
+    if channel in ("all", "email"):
+        try:
+            await svc.send_email_alert(FakeAlert())
+            results["email"] = "ok"
+        except Exception as e:
+            results["email"] = f"failed: {str(e)[:100]}"
+    if channel in ("all", "feishu"):
+        try:
+            await svc.send_feishu_alert(FakeAlert())
+            results["feishu"] = "ok"
+        except Exception as e:
+            results["feishu"] = f"failed: {str(e)[:100]}"
+    return {"message": "测试推送完成", "results": results}
+
+
 @router.put("/{alert_id}/resolve")
 async def resolve_alert(alert_id: int, db: Session = Depends(get_db)):
     """标记已处理"""
