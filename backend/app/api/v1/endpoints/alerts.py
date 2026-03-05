@@ -12,16 +12,17 @@ from app.schemas.alert import AlertCreate, AlertResponse
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AlertResponse])
+@router.get("/")
 async def list_alerts(
     device_id: Optional[int] = None,
     is_read: Optional[bool] = None,
     severity: Optional[str] = None,
+    alert_type: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db)
 ):
-    """获取告警列表"""
+    """获取告警列表，返回 {total, items}"""
     query = db.query(Alert)
     if device_id:
         query = query.filter(Alert.device_id == device_id)
@@ -29,7 +30,11 @@ async def list_alerts(
         query = query.filter(Alert.is_read == is_read)
     if severity:
         query = query.filter(Alert.severity == severity)
-    return query.order_by(Alert.created_at.desc()).offset(skip).limit(limit).all()
+    if alert_type:
+        query = query.filter(Alert.alert_type == alert_type)
+    total = query.count()
+    items = query.order_by(Alert.created_at.desc()).offset(skip).limit(limit).all()
+    return {"total": total, "items": items}
 
 
 @router.post("/", response_model=AlertResponse)

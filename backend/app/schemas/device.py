@@ -16,6 +16,8 @@ class DeviceBase(BaseModel):
     detection_enabled: bool = False
     model_id: Optional[int] = None
     confidence_threshold: float = 0.5
+    target_fps: int = 10
+    auto_connect: bool = False
 
 
 class DeviceCreate(DeviceBase):
