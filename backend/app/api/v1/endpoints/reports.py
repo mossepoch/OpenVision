@@ -26,8 +26,8 @@ def get_summary(range: str = "today", db: Session = Depends(get_db)):
 
     alerts = db.query(Alert).filter(Alert.created_at >= start).all()
     total = len(alerts)
-    resolved = sum(1 for a in alerts if a.status == "resolved")
-    pending = sum(1 for a in alerts if a.status == "pending")
+    resolved = sum(1 for a in alerts if a.is_resolved)
+    pending = sum(1 for a in alerts if not a.is_resolved)
     unread = sum(1 for a in alerts if not a.is_read)
 
     # 按告警类型统计

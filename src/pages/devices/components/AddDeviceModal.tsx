@@ -46,6 +46,8 @@ export default function AddDeviceModal({ onClose, onSuccess }: AddDeviceModalPro
         password: formData.password || undefined,
         detection_enabled: formData.detection_enabled,
         confidence_threshold: 0.5,
+        target_fps: parseInt(formData.target_fps) || 10,
+        auto_connect: false,
       });
       onSuccess?.();
       onClose();

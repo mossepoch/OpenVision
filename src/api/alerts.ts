@@ -20,13 +20,19 @@ export interface AlertListParams {
   device_id?: number;
   is_read?: boolean;
   severity?: string;
+  alert_type?: string;
   skip?: number;
   limit?: number;
 }
 
+export interface AlertListResponse {
+  total: number;
+  items: Alert[];
+}
+
 export const alertsApi = {
   list: (params?: AlertListParams) =>
-    api.get<Alert[]>('/api/v1/alerts/', params as Record<string, string | number>),
+    api.get<AlertListResponse>('/api/v1/alerts/', params as Record<string, string | number>),
 
   create: (data: Partial<Alert>) =>
     api.post<Alert>('/api/v1/alerts/', data),

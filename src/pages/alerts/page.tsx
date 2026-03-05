@@ -26,8 +26,8 @@ export default function AlertsPage() {
       if (filterSeverity !== 'all') params.severity = filterSeverity;
       if (filterRead === 'unread') params.is_read = 'false';
       if (filterRead === 'read') params.is_read = 'true';
-      const data = await alertsApi.list(params as any);
-      setAlerts(data);
+      const res = await alertsApi.list(params as any);
+      setAlerts(res.items ?? (res as any));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '加载告警失败');
     } finally {
@@ -38,7 +38,7 @@ export default function AlertsPage() {
   useEffect(() => {
     fetchAlerts();
     const timer = setInterval(() => {
-      alertsApi.list({ limit: 100 } as any).then(data => setAlerts(data)).catch(() => {});
+      alertsApi.list({ limit: 100 } as any).then(res => setAlerts(res.items ?? (res as any))).catch(() => {});
     }, 10000);
     return () => clearInterval(timer);
   }, [fetchAlerts]);
