@@ -1,5 +1,6 @@
-import { sopList, sopTemplates, stepTypes, sampleSopSteps } from '../../mocks/sopData';
+import { sopTemplates, stepTypes, sampleSopSteps } from '../../mocks/sopData';
 import { useState, useEffect } from 'react';
+import { sopApi, Sop } from '../../api/sop';
 
 export default function SopConfigPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -8,6 +9,63 @@ export default function SopConfigPage() {
   const [selectedStep, setSelectedStep] = useState<any>(null);
   const [sopMode, setSopMode] = useState<'vl_only' | 'cv_vl'>('vl_only');
   const [outputGranularity, setOutputGranularity] = useState<'segment' | 'step' | 'task'>('step');
+
+  // 真实数据
+  const [sopList, setSopList] = useState<Sop[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 创建表单
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetchSops();
+  }, []);
+
+  const fetchSops = async () => {
+    try {
+      setLoading(true);
+      const data = await sopApi.list();
+      setSopList(data);
+    } catch (e) {
+      console.error('Failed to fetch SOPs', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    try {
+      setCreating(true);
+      await sopApi.create({
+        name: newName,
+        description: newDesc,
+        mode: sopMode,
+        output_granularity: outputGranularity,
+        steps: [],
+      });
+      setNewName('');
+      setNewDesc('');
+      setShowCreateModal(false);
+      await fetchSops();
+    } catch (e) {
+      console.error('Failed to create SOP', e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('确认删除该 SOP？')) return;
+    try {
+      await sopApi.delete(id);
+      await fetchSops();
+    } catch (e) {
+      console.error('Failed to delete SOP', e);
+    }
+  };
 
   useEffect(() => {
     if (showCreateModal) {
@@ -98,89 +156,76 @@ export default function SopConfigPage() {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
           {/* Table Header */}
           <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200 text-[12px] font-semibold text-gray-600 uppercase tracking-wider">
-            <div className="col-span-4">名称</div>
+            <div className="col-span-5">名称</div>
             <div className="col-span-1">状态</div>
-            <div className="col-span-1">模式</div>
-            <div className="col-span-1">步骤</div>
-            <div className="col-span-2">引用工位数</div>
-            <div className="col-span-1">合规率</div>
+            <div className="col-span-2">模式</div>
+            <div className="col-span-1">步骤数</div>
+            <div className="col-span-1">创建时间</div>
             <div className="col-span-2 text-right">操作</div>
           </div>
           {/* Table Body */}
-          {sopList.map((sop) => (
-            <div
-              key={sop.id}
-              className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-100 hover:bg-purple-50/30 transition-colors cursor-pointer items-center"
-            >
-              <div className="col-span-4">
-                <div className="text-[14px] font-semibold text-gray-900 mb-1">{sop.name}</div>
-                <div className="text-[12px] text-gray-400 flex items-center gap-3">
-                  <span>{sop.createdBy}</span>
-                  <span>更新: {sop.lastModified}</span>
+          {loading ? (
+            <div className="px-6 py-12 text-center text-gray-400 text-[13px]">
+              <i className="ri-loader-4-line animate-spin text-[24px] block mb-2"></i>
+              加载中...
+            </div>
+          ) : sopList.length === 0 ? (
+            <div className="px-6 py-12 text-center text-gray-400 text-[13px]">
+              <i className="ri-file-list-3-line text-[40px] block mb-2 opacity-30"></i>
+              暂无 SOP，点击右上角创建第一个
+            </div>
+          ) : (
+            sopList.map((sop) => (
+              <div
+                key={sop.id}
+                className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-100 hover:bg-purple-50/30 transition-colors cursor-pointer items-center"
+              >
+                <div className="col-span-5">
+                  <div className="text-[14px] font-semibold text-gray-900 mb-1">{sop.name}</div>
+                  <div className="text-[12px] text-gray-400">{sop.description || '暂无描述'}</div>
+                </div>
+                <div className="col-span-1">
+                  <span
+                    className={`inline-flex px-3 py-1 rounded-full text-[11px] font-medium ${
+                      sop.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {sop.status === 'active' ? '已激活' : '草稿'}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <span
+                    className={`inline-flex px-3 py-1 rounded-full text-[11px] font-medium ${
+                      sop.mode === 'vl_only' ? 'bg-purple-50 text-purple-700' : 'bg-cyan-50 text-cyan-700'
+                    }`}
+                  >
+                    {sop.mode === 'vl_only' ? 'VL-only' : 'CV+VL'}
+                  </span>
+                </div>
+                <div className="col-span-1 text-[13px] text-gray-700 font-medium">
+                  {Array.isArray(sop.steps) ? sop.steps.length : 0}
+                </div>
+                <div className="col-span-1 text-[12px] text-gray-400">
+                  {sop.created_at ? new Date(sop.created_at).toLocaleDateString('zh-CN') : '-'}
+                </div>
+                <div className="col-span-2 flex items-center justify-end gap-1">
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
+                    title="编辑"
+                  >
+                    <i className="ri-edit-line text-[15px] text-gray-600"></i>
+                  </button>
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                    title="删除"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(sop.id); }}
+                  >
+                    <i className="ri-delete-bin-line text-[15px] text-red-400"></i>
+                  </button>
                 </div>
               </div>
-              <div className="col-span-1">
-                <span
-                  className={`inline-flex px-3 py-1 rounded-full text-[11px] font-medium ${
-                    sop.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}
-                >
-                  {sop.status === 'active' ? '已激活' : '草稿'}
-                </span>
-              </div>
-              <div className="col-span-1">
-                <span
-                  className={`inline-flex px-3 py-1 rounded-full text-[11px] font-medium ${
-                    sop.mode === 'vl_only' ? 'bg-purple-50 text-purple-700' : 'bg-cyan-50 text-cyan-700'
-                  }`}
-                >
-                  {sop.mode === 'vl_only' ? 'VL' : 'CV+VL'}
-                </span>
-              </div>
-              <div className="col-span-1 text-[13px] text-gray-700 font-medium">{sop.steps}</div>
-              <div className="col-span-2">
-                {sop.stations.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[15px] font-bold text-purple-600">
-                      {sop.stations.length}
-                    </span>
-                    <span className="text-[12px] text-gray-500">个工位</span>
-                  </div>
-                ) : (
-                  <span className="text-[13px] text-gray-400">未引用</span>
-                )}
-              </div>
-              <div className="col-span-1">
-                {sop.status === 'active' ? (
-                  <span className="text-[16px] font-bold text-purple-600">
-                    {sop.compliance}%
-                  </span>
-                ) : (
-                  <span className="text-[13px] text-gray-400">-</span>
-                )}
-              </div>
-              <div className="col-span-2 flex items-center justify-end gap-1">
-                <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
-                  title="编辑"
-                >
-                  <i className="ri-edit-line text-[15px] text-gray-600"></i>
-                </button>
-                <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
-                  title="复制"
-                >
-                  <i className="ri-file-copy-line text-[15px] text-gray-600"></i>
-                </button>
-                <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
-                  title="更多"
-                >
-                  <i className="ri-more-2-fill text-[15px] text-gray-600"></i>
-                </button>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
@@ -271,10 +316,12 @@ export default function SopConfigPage() {
                     <h3 className="text-[14px] font-semibold text-gray-900 mb-4">基本信息</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[12px] text-gray-600 mb-1.5 font-medium">SOP 名称</label>
+                        <label className="block text-[12px] text-gray-600 mb-1.5 font-medium">SOP 名称 *</label>
                         <input
                           type="text"
                           placeholder="输入 SOP 名称"
+                          value={newName}
+                          onChange={e => setNewName(e.target.value)}
                           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
                         />
                       </div>
@@ -302,6 +349,16 @@ export default function SopConfigPage() {
                         </div>
                       </div>
                       <div>
+                        <label className="block text-[12px] text-gray-600 mb-1.5 font-medium">描述</label>
+                        <input
+                          type="text"
+                          placeholder="简要描述该 SOP 的用途"
+                          value={newDesc}
+                          onChange={e => setNewDesc(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+                        />
+                      </div>
+                      <div>
                         <label className="block text-[12px] text-gray-600 mb-1.5 font-medium">输出粒度</label>
                         <select
                           value={outputGranularity}
@@ -312,14 +369,6 @@ export default function SopConfigPage() {
                           <option value="step">步骤级</option>
                           <option value="task">任务级</option>
                         </select>
-                      </div>
-                      <div>
-                        <label className="block text-[12px] text-gray-600 mb-1.5 font-medium">分类标签</label>
-                        <input
-                          type="text"
-                          placeholder="如：装配、质检、安全..."
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
-                        />
                       </div>
                     </div>
                     {sopMode === 'cv_vl' && (
@@ -435,13 +484,15 @@ export default function SopConfigPage() {
                         onClick={() => setShowCreateModal(false)}
                         className="px-5 py-2 border border-gray-300 text-gray-600 rounded-lg text-[13px] hover:bg-gray-50 transition-colors whitespace-nowrap cursor-pointer"
                       >
-                        保存草稿
+                        取消
                       </button>
                       <button
-                        className="px-5 py-2 text-white rounded-lg text-[13px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap cursor-pointer"
+                        onClick={handleCreate}
+                        disabled={creating || !newName.trim()}
+                        className="px-5 py-2 text-white rounded-lg text-[13px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap cursor-pointer disabled:opacity-50"
                         style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)' }}
                       >
-                        发布 SOP
+                        {creating ? '创建中...' : '发布 SOP'}
                       </button>
                     </div>
                   </div>
