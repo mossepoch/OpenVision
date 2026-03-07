@@ -359,7 +359,7 @@ export default function AnnotationPage() {
           >
             <option value="">— 使用示例数据 —</option>
             {datasets.map(d => (
-              <option key={d.id} value={d.id}>{d.name}（{d.image_count}张）</option>
+              <option key={d.name} value={d.name}>{d.name}（{d.image_count}张）</option>
             ))}
           </select>
           {datasetLoading && <span className="text-[11px] text-gray-400">加载中...</span>}
