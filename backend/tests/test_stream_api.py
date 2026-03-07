@@ -1,10 +1,19 @@
 """
 摄像头流 API 测试
 测试端点：/api/v1/stream/
+
+注意: 这些测试会触发真实的 camera_service.connect()，
+需要 RTSP 流可用，否则会 block。CI 环境跳过。
 """
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("TESTING") == "1",
+    reason="Stream tests require real RTSP camera, skipped in CI/TESTING mode"
+)
 
 
 class TestConnectCamera:
