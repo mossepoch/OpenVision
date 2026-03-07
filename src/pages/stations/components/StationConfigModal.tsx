@@ -1,9 +1,28 @@
 
 import { useState, useEffect } from 'react';
-import { devicesData } from '../../../mocks/devicesData';
-import { modelsData } from '../../../mocks/modelsData';
-import { sopList } from '../../../mocks/sopData';
-import { shiftOptions, runCycleOptions, frameRateOptions } from '../../../mocks/stationsData';
+import { devicesApi, type Device } from '../../../api/devices';
+import { trainingApi, type TrainedModel } from '../../../api/training';
+import { sopApi, type Sop } from '../../../api/sop';
+
+// 保留静态选项（这些不是 API 数据）
+const shiftOptions = [
+  { value: 'morning', label: '早班 (08:00-16:00)' },
+  { value: 'afternoon', label: '中班 (16:00-00:00)' },
+  { value: 'night', label: '夜班 (00:00-08:00)' },
+];
+
+const runCycleOptions = [
+  { value: 'daily', label: '每天' },
+  { value: 'weekdays', label: '工作日（周一至周五）' },
+  { value: 'custom', label: '自定义' },
+];
+
+const frameRateOptions = [
+  { value: 1, label: '每1秒抽取1帧' },
+  { value: 2, label: '每1秒抽取2帧' },
+  { value: 5, label: '每1秒抽取5帧' },
+  { value: 10, label: '每1秒抽取10帧' },
+];
 
 type DetectionMode = 'vl_only' | 'cv_vl';
 type RunCycle = 'daily' | 'weekdays' | 'custom';
@@ -49,6 +68,12 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
   const isEdit = !!station;
   const [activeTab, setActiveTab] = useState<Tab>('基本信息');
 
+  // 从 API 加载的数据
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [trainedModels, setTrainedModels] = useState<TrainedModel[]>([]);
+  const [sops, setSops] = useState<Sop[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
   const [form, setForm] = useState<StationForm>({
     name: station?.name || '',
     location: station?.location || '',
@@ -67,11 +92,22 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
     frameRate: station?.frameRate || 1,
   });
 
-  const onlineCameras = devicesData.devices.filter(
+  // 加载设备、模型、SOP 列表
+  useEffect(() => {
+    Promise.all([
+      devicesApi.list().catch(err => { console.error('Failed to load devices:', err); return []; }),
+      trainingApi.listModels().catch(err => { console.error('Failed to load models:', err); return []; }),
+      sopApi.list().catch(err => { console.error('Failed to load SOPs:', err); return []; }),
+    ]).then(([deviceList, modelList, sopList]) => {
+      setDevices(deviceList as Device[]);
+      setTrainedModels(modelList as TrainedModel[]);
+      setSops(sopList as Sop[]);
+    }).finally(() => setDataLoading(false));
+  }, []);
+
+  const onlineCameras = devices.filter(
     (d) => d.status === 'online' || d.status === 'alert'
   );
-  const downloadedModels = modelsData.filter((m) => m.downloaded);
-  const activeSops = sopList;
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -97,8 +133,8 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
     }));
   };
 
-  const selectedSop = activeSops.find((s) => s.id === form.sopId);
-  const selectedModel = downloadedModels.find((m) => m.id === form.cvModelId);
+  const selectedSop = sops.find((s) => s.id === form.sopId);
+  const selectedModel = trainedModels.find((m) => m.name === form.cvModelId);
 
   const handleSubmit = () => {
     if (!form.name.trim()) return;
@@ -159,6 +195,13 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
 
+          {dataLoading && (
+            <div className="text-center text-[12px] text-gray-400 py-4">
+              <i className="ri-loader-4-line animate-spin text-[18px] block mb-1"></i>
+              加载配置数据...
+            </div>
+          )}
+
           {/* ── Tab 1: 基本信息 ── */}
           {activeTab === '基本信息' && (
             <div className="space-y-5">
@@ -199,23 +242,24 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
                 </div>
                 <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1">
                   {onlineCameras.map((cam) => {
-                    const selected = form.cameras.includes(cam.id);
+                    const camId = String(cam.id);
+                    const selected = form.cameras.includes(camId);
                     return (
-                      <div key={cam.id} onClick={() => toggleCamera(cam.id)}
+                      <div key={cam.id} onClick={() => toggleCamera(camId)}
                         className={`flex items-center gap-2.5 p-2.5 border rounded-lg cursor-pointer transition-all ${selected ? 'border-[#0052d9] bg-blue-50/50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
                         <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${selected ? 'border-[#0052d9] bg-[#0052d9]' : 'border-gray-300'}`}>
                           {selected && <i className="ri-check-line text-white text-[10px]"></i>}
                         </div>
                         <div className="min-w-0">
                           <div className="text-[11px] font-medium text-gray-800 truncate">{cam.name}</div>
-                          <div className="text-[10px] text-gray-400 truncate">{cam.id} · {cam.location}</div>
+                          <div className="text-[10px] text-gray-400 truncate">{cam.id} · {cam.location ?? '-'}</div>
                         </div>
                         <span className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${cam.status === 'online' ? 'bg-green-500' : 'bg-yellow-400'}`}></span>
                       </div>
                     );
                   })}
                 </div>
-                {onlineCameras.length === 0 && (
+                {!dataLoading && onlineCameras.length === 0 && (
                   <div className="text-center py-6 text-[12px] text-gray-400">
                     <i className="ri-camera-off-line text-[24px] block mb-1"></i>暂无在线摄像头
                   </div>
@@ -232,9 +276,9 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
                 <h3 className={sectionTitleCls}>绑定 SOP 流程</h3>
                 <select value={form.sopId} onChange={(e) => setForm({ ...form, sopId: e.target.value })} className={`${inputCls} cursor-pointer`}>
                   <option value="">选择 SOP 流程</option>
-                  {activeSops.map((sop) => (
+                  {sops.map((sop) => (
                     <option key={sop.id} value={sop.id}>
-                      {sop.name}（{sop.steps} 步骤 · {sop.mode === 'vl_only' ? 'VL-only' : 'CV+VL'}）
+                      {sop.name}（{Array.isArray(sop.steps) ? sop.steps.length : 0} 步骤 · {sop.mode === 'vl_only' ? 'VL-only' : 'CV+VL'}）
                     </option>
                   ))}
                 </select>
@@ -242,7 +286,7 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
                   <div className="mt-2 p-2.5 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-2">
                     <i className="ri-information-line text-blue-500 text-[13px]"></i>
                     <span className="text-[11px] text-blue-700">
-                      该 SOP 共 {selectedSop.steps} 个步骤，当前已被 {selectedSop.stations.length} 个工位使用
+                      该 SOP 共 {Array.isArray(selectedSop.steps) ? selectedSop.steps.length : 0} 个步骤
                     </span>
                   </div>
                 )}
@@ -275,14 +319,14 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
                     <div>
                       <label className={labelCls}>CV 检测模型 <span className="text-red-500">*</span></label>
                       <select value={form.cvModelId} onChange={(e) => setForm({ ...form, cvModelId: e.target.value })} className={`${inputCls} cursor-pointer bg-white`}>
-                        <option value="">选择已下载的模型</option>
-                        {downloadedModels.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}（{m.type === 'pretrained' ? '预训练' : '自训练'} · mAP50: {m.mAP50}%）
+                        <option value="">选择已训练的模型</option>
+                        {trainedModels.map((m) => (
+                          <option key={m.name} value={m.name}>
+                            {m.name}（{m.size_mb.toFixed(1)} MB）
                           </option>
                         ))}
                       </select>
-                      {selectedModel && <p className="text-[11px] text-gray-400 mt-1">{selectedModel.description}</p>}
+                      {selectedModel && <p className="text-[11px] text-gray-400 mt-1">{selectedModel.path}</p>}
                     </div>
                     <div>
                       <label className={labelCls}>
@@ -318,7 +362,7 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
                 </button>
               </div>
 
-              {/* 计划详情（仅启用时高亮，未启用时灰显） */}
+              {/* 计划详情 */}
               <div className={`space-y-5 transition-opacity ${form.planEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
 
                 {/* 运行时段 */}
@@ -468,7 +512,7 @@ export default function StationConfigModal({ station, onClose, onSave }: Props) 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
           <div className="flex gap-1.5">
-            {TABS.map((tab, i) => (
+            {TABS.map((tab) => (
               <div key={tab} className={`w-1.5 h-1.5 rounded-full transition-colors ${activeTab === tab ? 'bg-[#0052d9]' : 'bg-gray-300'}`}></div>
             ))}
           </div>
