@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { datasetsData } from '../../mocks/datasetsData';
 import DatasetCard from './components/DatasetCard';
 import UploadZone from './components/UploadZone';
 import DatasetDetailModal from './components/DatasetDetailModal';
@@ -30,6 +29,7 @@ type FilterStatus = 'all' | 'ready' | 'processing' | 'pending';
 export default function DatasetsPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [viewDataset, setViewDataset] = useState<Dataset | null>(null);
@@ -59,10 +59,12 @@ export default function DatasetsPage() {
         previewImages: [],
       }));
       setDatasets(mapped);
+      setError('');
       setLoading(false);
-    }).catch(() => {
-      // fallback to mock on error
-      setDatasets(datasetsData);
+    }).catch((err) => {
+      console.error('Failed to load datasets:', err);
+      setDatasets([]);
+      setError('数据集加载失败');
       setLoading(false);
     });
   }, []);
@@ -215,6 +217,12 @@ export default function DatasetsPage() {
         </div>
         <span className="text-[12px] text-gray-400 ml-auto">共 {filtered.length} 个数据集</span>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl px-4 py-3 text-[12px]">
+          {error}
+        </div>
+      )}
 
       {/* Dataset Grid */}
       {filtered.length > 0 ? (
