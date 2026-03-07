@@ -9,6 +9,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base, get_db
 from app.models.device import Device
+from app.models.user import User      # noqa: F401 — 确保 users 表被创建
+from app.models.alert import Alert    # noqa: F401 — 确保 alerts 表被创建
 import sys
 from pathlib import Path
 
