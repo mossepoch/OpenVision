@@ -1,4 +1,4 @@
-import apiClient from './client';
+import { api } from './client';
 
 export interface Sop {
   id: string;
@@ -20,9 +20,9 @@ export interface SopCreate {
 }
 
 export const sopApi = {
-  list: () => apiClient.get<Sop[]>('/sop/').then(r => r.data),
-  get: (id: string) => apiClient.get<Sop>(`/sop/${id}`).then(r => r.data),
-  create: (data: SopCreate) => apiClient.post<Sop>('/sop/', data).then(r => r.data),
-  update: (id: string, data: Partial<Sop>) => apiClient.put<Sop>(`/sop/${id}`, data).then(r => r.data),
-  delete: (id: string) => apiClient.delete(`/sop/${id}`).then(r => r.data),
+  list: () => api.get<Sop[]>('/api/v1/sop/'),
+  get: (id: string) => api.get<Sop>(`/api/v1/sop/${id}`),
+  create: (data: SopCreate) => api.post<Sop>('/api/v1/sop/', data),
+  update: (id: string, data: Partial<Sop>) => api.put<Sop>(`/api/v1/sop/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/sop/${id}`),
 };
