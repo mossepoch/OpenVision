@@ -144,7 +144,7 @@ class TestDetectionStatus:
         data = response.json()
         
         # 检查必需字段
-        assert "model_loaded" in data or "status" in data
+        assert "loaded" in data
         assert "notification" in data
 
 
