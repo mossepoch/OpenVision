@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import cameras, auth, dashboard, devices, alerts, stream, detection, datasets, training, stations, sop, reports, inference
+from app.api.v1.endpoints import cameras, auth, dashboard, devices, alerts, stream, detection, datasets, training, stations, sop, reports, inference, annotations, annotation
 
 api_router = APIRouter()
 api_router.include_router(cameras.router, prefix="/cameras", tags=["cameras"])
@@ -15,3 +15,5 @@ api_router.include_router(stations.router, prefix="/stations", tags=["站点管�
 api_router.include_router(sop.router, prefix="/sop", tags=["SOP配置"])
 api_router.include_router(reports.router, prefix="/reports", tags=["统计报表"])
 api_router.include_router(inference.router, prefix="/inference", tags=["模型推理"])
+api_router.include_router(annotations.router, prefix="/annotations", tags=["标注任务"])
+api_router.include_router(annotation.router, prefix="/annotation", tags=["标注管理"])
