@@ -128,11 +128,17 @@ class CameraService:
         if not CV2_AVAILABLE:
             logger.warning("opencv not available")
             return
+        # 先取出旧 stream（避免嵌套锁死锁）
+        old_stream = None
         with self._lock:
-            if device_id in self._streams:
-                self.disconnect(device_id)
-            stream = CameraStream(device_id, url, target_fps)
-            stream.start()
+            old_stream = self._streams.pop(device_id, None)
+        if old_stream:
+            old_stream.stop()
+            logger.info(f"Camera {device_id} stopped (reconnect)")
+        # 创建新 stream
+        stream = CameraStream(device_id, url, target_fps)
+        stream.start()
+        with self._lock:
             self._streams[device_id] = stream
             logger.info(f"Camera {device_id} started")
 
