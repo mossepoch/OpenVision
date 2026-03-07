@@ -1,31 +1,38 @@
+type CompareModel = {
+  id: string;
+  name: string;
+  version: string;
+  size: string;
+  type: string;
+  fileSize: string;
+  parameters: string;
+  mAP50: number;
+  mAP5095: number;
+  speed: string;
+  trainedOn: string;
+  classes: number;
+};
+
 interface ComparePanelProps {
-  models: Array<{
-    id: string;
-    name: string;
-    version: string;
-    size: string;
-    type: string;
-    fileSize: string;
-    parameters: string;
-    mAP50: number;
-    mAP5095: number;
-    speed: string;
-    trainedOn: string;
-    classes: number;
-  }>;
+  models: CompareModel[];
   onClose: () => void;
 }
 
 export default function ComparePanel({ models, onClose }: ComparePanelProps) {
   if (models.length === 0) return null;
 
-  const metrics = [
-    { key: 'mAP50', label: 'mAP50', unit: '%', format: (v: number) => v.toFixed(1) },
-    { key: 'mAP5095', label: 'mAP50-95', unit: '%', format: (v: number) => v.toFixed(1) },
-    { key: 'speed', label: '推理速度', unit: '', format: (v: string) => v },
-    { key: 'parameters', label: '参数量', unit: '', format: (v: string) => v },
-    { key: 'fileSize', label: '文件大小', unit: '', format: (v: string) => v },
-    { key: 'classes', label: '类别数', unit: '', format: (v: number) => v.toString() }
+  const metrics: Array<{
+    key: keyof Pick<CompareModel, 'mAP50' | 'mAP5095' | 'speed' | 'parameters' | 'fileSize' | 'classes'>;
+    label: string;
+    unit: string;
+    format: (value: number | string) => string;
+  }> = [
+    { key: 'mAP50', label: 'mAP50', unit: '%', format: (v) => Number(v).toFixed(1) },
+    { key: 'mAP5095', label: 'mAP50-95', unit: '%', format: (v) => Number(v).toFixed(1) },
+    { key: 'speed', label: '推理速度', unit: '', format: (v) => String(v) },
+    { key: 'parameters', label: '参数量', unit: '', format: (v) => String(v) },
+    { key: 'fileSize', label: '文件大小', unit: '', format: (v) => String(v) },
+    { key: 'classes', label: '类别数', unit: '', format: (v) => String(v) }
   ];
 
   return (
@@ -121,10 +128,8 @@ export default function ComparePanel({ models, onClose }: ComparePanelProps) {
                         {metric.label}
                       </td>
                       {models.map((model, modelIdx) => {
-                        const value = model[metric.key as keyof typeof model];
-                        const displayValue = typeof value === 'number' 
-                          ? metric.format(value) 
-                          : metric.format(value as string);
+                        const value = model[metric.key];
+                        const displayValue = metric.format(value);
                         const isBest = modelIdx === bestIdx;
 
                         return (

@@ -91,31 +91,6 @@ export default function AnnotationPage() {
       .finally(() => setDatasetLoading(false));
   }, [activeDatasetName, datasets]);
 
-  // 保存标注到后端
-  const handleSaveToBackend = useCallback(async () => {
-    if (!activeDatasetName) { showToast('请先选择数据集', 'info'); return; }
-    const anns = allAnnotations[selectedImageId] ?? [];
-    const labelsList = activeDatasetLabels.length > 0 ? activeDatasetLabels : categories.map(c => c.name);
-    const labels: YoloLabel[] = anns.map(ann => {
-      const catIdx = categories.findIndex(c => c.id === ann.categoryId);
-      return {
-        class_id: catIdx >= 0 ? catIdx : 0,
-        cx: ann.x + ann.width / 2,
-        cy: ann.y + ann.height / 2,
-        w: ann.width,
-        h: ann.height,
-      };
-    });
-    try {
-      await datasetsApi.saveLabels(activeDatasetName, selectedImageId, labels);
-      showToast(`已保存 ${labels.length} 条标注`, 'success');
-      // 更新图片状态
-      setImages(prev => prev.map(img =>
-        img.id === selectedImageId ? { ...img, annotationCount: labels.length, status: labels.length > 0 ? 'labeled' : 'unlabeled' } : img
-      ));
-    } catch { showToast('保存失败', 'error'); }
-  }, [activeDatasetName, selectedImageId, allAnnotations, categories, activeDatasetLabels]);
-
   // ---------- Annotations ----------
   const [allAnnotations, setAllAnnotations] = useState<Record<string, BBox[]>>(() => {
     const init: Record<string, BBox[]> = {};
@@ -273,6 +248,32 @@ export default function AnnotationPage() {
     handleAnnotationsChange(next);
     showToast(`AI 检测到 ${annotations.length} 个目标`, 'success');
   };
+
+  // 保存标注到后端
+  const handleSaveToBackend = useCallback(async () => {
+    if (!activeDatasetName) { showToast('请先选择数据集', 'info'); return; }
+    const anns = allAnnotations[selectedImageId] ?? [];
+    const labels: YoloLabel[] = anns.map(ann => {
+      const catIdx = categories.findIndex(c => c.id === ann.categoryId);
+      return {
+        class_id: catIdx >= 0 ? catIdx : 0,
+        cx: ann.x + ann.width / 2,
+        cy: ann.y + ann.height / 2,
+        w: ann.width,
+        h: ann.height,
+      };
+    });
+    try {
+      await datasetsApi.saveLabels(activeDatasetName, selectedImageId, labels);
+      showToast(`已保存 ${labels.length} 条标注`, 'success');
+      setImages(prev => prev.map(img =>
+        img.id === selectedImageId ? { ...img, annotationCount: labels.length, status: labels.length > 0 ? 'labeled' : 'unlabeled' } : img
+      ));
+    } catch (error) {
+      console.error('Failed to save labels:', error);
+      showToast('保存失败', 'error');
+    }
+  }, [activeDatasetName, selectedImageId, allAnnotations, categories]);
 
   // ---------- Video frame extraction ----------
   const handleFramesExtracted = (
