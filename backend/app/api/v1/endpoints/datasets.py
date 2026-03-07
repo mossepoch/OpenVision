@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -118,27 +118,80 @@ def get_image(name: str, filename: str):
     return FileResponse(path)
 
 
+class YoloLabelObj(BaseModel):
+    class_id: int
+    cx: float
+    cy: float
+    w: float
+    h: float
+
+
 class LabelData(BaseModel):
     labels: List[str]  # YOLO format lines: "class_id cx cy w h"
 
 
 @router.post("/{name}/labels/{filename}")
-def save_labels(name: str, filename: str, data: LabelData):
+async def save_labels(name: str, filename: str, request: "Request"):
+    """
+    保存标注。支持两种格式：
+    1. YoloLabel 对象数组: [{"class_id":0,"cx":0.5,"cy":0.5,"w":0.1,"h":0.2}, ...]
+    2. LabelData 对象: {"labels": ["0 0.5 0.5 0.1 0.2", ...]}
+    """
+    from fastapi import Request as _Req  # noqa – already imported via param type
     stem = Path(filename).stem
     label_path = DATASETS_DIR / name / "labels" / f"{stem}.txt"
     label_path.parent.mkdir(exist_ok=True)
-    label_path.write_text("\n".join(data.labels))
-    return {"saved": len(data.labels), "file": f"{stem}.txt"}
+
+    body = await request.json()
+
+    # 格式1: 前端发来的 YoloLabel 对象数组
+    if isinstance(body, list):
+        lines = []
+        for item in body:
+            cid = item.get("class_id", 0)
+            cx = item.get("cx", 0)
+            cy = item.get("cy", 0)
+            w = item.get("w", 0)
+            h = item.get("h", 0)
+            lines.append(f"{cid} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
+        label_path.write_text("\n".join(lines))
+        return {"message": "ok", "count": len(lines), "file": f"{stem}.txt"}
+
+    # 格式2: {"labels": [...]}  原有格式
+    label_lines = body.get("labels", [])
+    label_path.write_text("\n".join(label_lines))
+    return {"message": "ok", "count": len(label_lines), "file": f"{stem}.txt"}
 
 
 @router.get("/{name}/labels/{filename}")
-def get_labels(name: str, filename: str):
+def get_labels(name: str, filename: str, format: str = "structured"):
+    """
+    获取标注。
+    format=structured (默认): 返回 YoloLabel 对象数组，前端直接用
+    format=raw: 返回原始文本行
+    """
     stem = Path(filename).stem
     label_path = DATASETS_DIR / name / "labels" / f"{stem}.txt"
     if not label_path.exists():
-        return {"labels": []}
+        return {"image": filename, "labels": [], "count": 0}
     lines = [l for l in label_path.read_text().splitlines() if l.strip()]
-    return {"labels": lines}
+
+    if format == "raw":
+        return {"image": filename, "labels": lines, "count": len(lines)}
+
+    # 结构化输出
+    structured = []
+    for line in lines:
+        parts = line.split()
+        if len(parts) >= 5:
+            structured.append({
+                "class_id": int(parts[0]),
+                "cx": float(parts[1]),
+                "cy": float(parts[2]),
+                "w": float(parts[3]),
+                "h": float(parts[4]),
+            })
+    return {"image": filename, "labels": structured, "count": len(structured)}
 
 
 @router.post("/{name}/images/{filename}/auto-label")
@@ -221,3 +274,184 @@ def auto_label_all(name: str, confidence: float = 0.25):
         "labeled": sum(1 for r in results if r["ok"]),
         "results": results,
     }
+
+
+# ── 标注专属接口 ──────────────────────────────────────────────────────────
+
+
+@router.get("/{name}/annotation-stats")
+def annotation_stats(name: str):
+    """
+    数据集标注统计：已标注/未标注数量、各类别标注数量分布
+    """
+    import json
+    ds_dir = DATASETS_DIR / name
+    if not ds_dir.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    images_dir = ds_dir / "images"
+    labels_dir = ds_dir / "labels"
+    meta_file = ds_dir / "meta.json"
+    meta = json.loads(meta_file.read_text()) if meta_file.exists() else {}
+    label_names = meta.get("labels", [])
+
+    exts = {".jpg", ".jpeg", ".png", ".bmp"}
+    all_images = [f for f in images_dir.iterdir() if f.suffix.lower() in exts] if images_dir.exists() else []
+
+    labeled = 0
+    unlabeled = 0
+    total_boxes = 0
+    class_dist: dict = {}
+
+    for img in all_images:
+        label_file = labels_dir / f"{img.stem}.txt"
+        if label_file.exists() and label_file.stat().st_size > 0:
+            labeled += 1
+            lines = [l for l in label_file.read_text().splitlines() if l.strip()]
+            total_boxes += len(lines)
+            for line in lines:
+                parts = line.split()
+                if parts:
+                    cid = int(parts[0])
+                    cname = label_names[cid] if cid < len(label_names) else str(cid)
+                    class_dist[cname] = class_dist.get(cname, 0) + 1
+        else:
+            unlabeled += 1
+
+    return {
+        "dataset": name,
+        "total_images": len(all_images),
+        "labeled": labeled,
+        "unlabeled": unlabeled,
+        "total_boxes": total_boxes,
+        "class_distribution": class_dist,
+        "progress": round(labeled / len(all_images) * 100, 1) if all_images else 0,
+    }
+
+
+@router.post("/{name}/labels-batch")
+async def save_labels_batch(name: str, request: Request):
+    """
+    批量保存标注。
+    请求体: { "annotations": { "img1.jpg": [...labels], "img2.jpg": [...labels] } }
+    每个 labels 可以是 YoloLabel 对象数组 或 原始字符串数组
+    """
+    ds_dir = DATASETS_DIR / name
+    if not ds_dir.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    labels_dir = ds_dir / "labels"
+    labels_dir.mkdir(exist_ok=True)
+
+    body = await request.json()
+    annotations = body.get("annotations", {})
+    saved_count = 0
+
+    for filename, label_data in annotations.items():
+        stem = Path(filename).stem
+        label_path = labels_dir / f"{stem}.txt"
+
+        if isinstance(label_data, list) and len(label_data) > 0:
+            if isinstance(label_data[0], dict):
+                # YoloLabel 对象数组
+                lines = []
+                for item in label_data:
+                    cid = item.get("class_id", 0)
+                    cx = item.get("cx", 0)
+                    cy = item.get("cy", 0)
+                    w = item.get("w", 0)
+                    h = item.get("h", 0)
+                    lines.append(f"{cid} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
+                label_path.write_text("\n".join(lines))
+            else:
+                # 原始字符串数组
+                label_path.write_text("\n".join(str(l) for l in label_data))
+        else:
+            # 空标注 → 写空文件（或清空已有标注）
+            label_path.write_text("")
+        saved_count += 1
+
+    return {"message": f"Batch saved {saved_count} files", "count": saved_count}
+
+
+@router.delete("/{name}/images/{filename}")
+def delete_image(name: str, filename: str):
+    """删除数据集中的单张图片及其标注"""
+    image_path = DATASETS_DIR / name / "images" / filename
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    image_path.unlink()
+    # 同时删除对应标注
+    stem = Path(filename).stem
+    label_path = DATASETS_DIR / name / "labels" / f"{stem}.txt"
+    if label_path.exists():
+        label_path.unlink()
+    return {"message": f"Deleted {filename}"}
+
+
+@router.post("/{name}/export")
+def export_dataset(name: str, format: str = "yolo"):
+    """
+    导出数据集为压缩包（YOLO 格式）
+    返回下载链接
+    """
+    import zipfile
+    import tempfile
+    import json
+
+    ds_dir = DATASETS_DIR / name
+    if not ds_dir.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    # 生成 data.yaml
+    meta_file = ds_dir / "meta.json"
+    meta = json.loads(meta_file.read_text()) if meta_file.exists() else {"labels": []}
+    labels = meta.get("labels", [])
+
+    # 创建临时 zip
+    export_dir = BASE_DIR / "exports"
+    export_dir.mkdir(exist_ok=True)
+    zip_path = export_dir / f"{name}_yolo.zip"
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        # data.yaml
+        yaml_content = f"path: .\ntrain: images\nval: images\n\nnc: {len(labels)}\nnames: {labels}\n"
+        zf.writestr(f"{name}/data.yaml", yaml_content)
+
+        # images
+        images_dir = ds_dir / "images"
+        if images_dir.exists():
+            for img in images_dir.iterdir():
+                zf.write(img, f"{name}/images/{img.name}")
+
+        # labels
+        labels_dir = ds_dir / "labels"
+        if labels_dir.exists():
+            for lbl in labels_dir.iterdir():
+                zf.write(lbl, f"{name}/labels/{lbl.name}")
+
+    return FileResponse(
+        zip_path,
+        filename=f"{name}_yolo.zip",
+        media_type="application/zip",
+    )
+
+
+@router.put("/{name}")
+def update_dataset(name: str, data: DatasetCreate):
+    """更新数据集元信息（描述、类别标签）"""
+    import json
+    ds_dir = DATASETS_DIR / name
+    if not ds_dir.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    meta = {"description": data.description, "labels": data.labels}
+    (ds_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
+    images_dir = ds_dir / "images"
+    labels_dir = ds_dir / "labels"
+    return DatasetInfo(
+        name=name,
+        description=data.description or "",
+        labels=data.labels,
+        image_count=len(list(images_dir.glob("*"))) if images_dir.exists() else 0,
+        label_count=len(list(labels_dir.glob("*.txt"))) if labels_dir.exists() else 0,
+    )
