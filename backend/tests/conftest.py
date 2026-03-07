@@ -68,7 +68,7 @@ def test_device(db_session):
     device = Device(
         name="Test Camera",
         protocol="rtsp",
-        url="rtsp://localhost:8554/stream",
+        url="rtsp://192.168.110.42:8080/h264_ulaw.sdp",
         is_active=True,
         status="offline",
         auto_connect=False,
