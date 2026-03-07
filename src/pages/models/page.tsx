@@ -1,57 +1,121 @@
 import { useState, useMemo, useEffect } from 'react';
-import { modelsData } from '../../mocks/modelsData';
 import ModelCard from './components/ModelCard';
 import ModelDetailModal from './components/ModelDetailModal';
 import ExportModal from './components/ExportModal';
 import ComparePanel from './components/ComparePanel';
 import { trainingApi, type TrainedModel } from '../../api/training';
 
+// 将 API TrainedModel 映射为 UI 需要的模型结构
+interface DisplayModel {
+  id: string;
+  name: string;
+  version: string;
+  size: string;
+  type: string;
+  fileSize: string;
+  parameters: string;
+  mAP50: number;
+  mAP5095: number;
+  speed: string;
+  description: string;
+  downloadUrl: string | null;
+  downloaded: boolean;
+  lastUsed: string | null;
+  trainedOn: string;
+  classes: number;
+  trainDate?: string;
+  epochs?: number;
+  baseModel?: string;
+  customClasses?: string[];
+}
+
+function mapToDisplayModel(m: TrainedModel): DisplayModel {
+  const isYolov8 = m.name.toLowerCase().includes('yolov8');
+  const sizeLabel = m.name.toLowerCase().includes('nano') || m.name.includes('n.') ? 'nano'
+    : m.name.toLowerCase().includes('small') || m.name.includes('s.') ? 'small'
+    : m.name.toLowerCase().includes('medium') || m.name.includes('m.') ? 'medium'
+    : m.name.toLowerCase().includes('large') || m.name.includes('l.') ? 'large'
+    : 'nano';
+  return {
+    id: m.name,
+    name: m.name,
+    version: isYolov8 ? 'v8' : 'v8',
+    size: sizeLabel,
+    type: 'custom',
+    fileSize: `${m.size_mb.toFixed(1)} MB`,
+    parameters: '-',
+    mAP50: 0,
+    mAP5095: 0,
+    speed: '-',
+    description: `自训练模型 - ${m.path}`,
+    downloadUrl: null,
+    downloaded: true,
+    lastUsed: new Date(m.created_at * 1000).toLocaleString('zh-CN'),
+    trainedOn: '自定义数据集',
+    classes: 0,
+    trainDate: new Date(m.created_at * 1000).toLocaleDateString('zh-CN'),
+    baseModel: m.name.split('/').pop()?.split('_')[0] ?? 'yolov8n',
+  };
+}
+
 export default function ModelsPage() {
-  const [models, setModels] = useState<TrainedModel[]>([]);
+  const [rawModels, setRawModels] = useState<TrainedModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [versionFilter, setVersionFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [downloadedFilter, setDownloadedFilter] = useState('all');
-  const [selectedModel, setSelectedModel] = useState<TrainedModel | null>(null);
+  const [selectedModel, setSelectedModel] = useState<DisplayModel | null>(null);
   const [exportingModel, setExportingModel] = useState<string | null>(null);
   const [isComparing, setIsComparing] = useState(false);
   const [compareModels, setCompareModels] = useState<string[]>([]);
 
   useEffect(() => {
     trainingApi.listModels().then(list => {
-      setModels(list);
+      setRawModels(list);
       setLoading(false);
-    }).catch(() => {
-      // fallback
-      setModels([]);
+    }).catch(err => {
+      console.error('Failed to load models:', err);
+      setRawModels([]);
       setLoading(false);
     });
   }, []);
+
+  const models = useMemo(() => rawModels.map(mapToDisplayModel), [rawModels]);
 
   // 筛选模型
   const filteredModels = useMemo(() => {
     return models.filter((model) => {
       const matchSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchDownloaded = downloadedFilter === 'all' || 
-                             (downloadedFilter === 'downloaded' && !!model.best) ||
-                             (downloadedFilter === 'not-downloaded' && !model.best);
-      return matchSearch && matchDownloaded;
+      const matchVersion = versionFilter === 'all' || model.version === versionFilter;
+      const matchType = typeFilter === 'all' || model.type === typeFilter;
+      const matchSize = sizeFilter === 'all' || model.size === sizeFilter;
+      const matchDownloaded = downloadedFilter === 'all' ||
+        (downloadedFilter === 'downloaded' && model.downloaded) ||
+        (downloadedFilter === 'not-downloaded' && !model.downloaded);
+      return matchSearch && matchVersion && matchType && matchSize && matchDownloaded;
     });
-  }, [models, searchQuery, downloadedFilter]);
+  }, [models, searchQuery, versionFilter, typeFilter, sizeFilter, downloadedFilter]);
 
   // 统计数据
   const stats = useMemo(() => {
     return {
       total: models.length,
-      trained: models.filter(m => m.best).length,
-      failed: models.filter(m => !m.best).length,
+      pretrained: models.filter(m => m.type === 'pretrained').length,
+      custom: models.filter(m => m.type === 'custom').length,
+      downloaded: models.filter(m => m.downloaded).length,
+      v8: models.filter(m => m.version === 'v8').length,
+      v11: models.filter(m => m.version === 'v11').length,
     };
   }, [models]);
 
+  const handleDownload = (id: string) => {
+    console.log('Download model:', id);
+  };
+
   const handleExport = (id: string) => {
-    const model = models.find(m => m.name === id);
+    const model = models.find(m => m.id === id);
     if (model) {
       setExportingModel(model.name);
     }
@@ -59,7 +123,6 @@ export default function ModelsPage() {
 
   const handleExportConfirm = async (format: string) => {
     console.log('导出格式:', format);
-    // 模拟导出
   };
 
   const handleCompare = (id: string, checked: boolean) => {
@@ -72,7 +135,7 @@ export default function ModelsPage() {
     }
   };
 
-  const compareModelsData = models.filter(m => compareModels.includes(m.name));
+  const compareModelsData = models.filter(m => compareModels.includes(m.id));
 
   return (
     <div className="p-6 space-y-5 min-h-full">
@@ -140,6 +203,13 @@ export default function ModelsPage() {
         </div>
       </div>
 
+      {loading && (
+        <div className="text-center text-[13px] text-gray-400 py-4">
+          <i className="ri-loader-4-line animate-spin text-[20px] block mb-2"></i>
+          加载模型列表...
+        </div>
+      )}
+
       {/* 搜索和筛选 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         <div className="flex gap-3">
@@ -197,7 +267,7 @@ export default function ModelsPage() {
 
       {/* 模型列表 */}
       <div>
-        {filteredModels.length === 0 ? (
+        {!loading && filteredModels.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 flex items-center justify-center bg-gray-100 rounded-full mx-auto mb-4">
               <i className="ri-inbox-line text-3xl text-gray-400"></i>
@@ -212,7 +282,7 @@ export default function ModelsPage() {
                 model={model}
                 onDownload={handleDownload}
                 onExport={handleExport}
-                onViewDetail={(id) => setSelectedModel(modelsData.find(m => m.id === id) || null)}
+                onViewDetail={(id) => setSelectedModel(models.find(m => m.id === id) || null)}
                 onCompare={handleCompare}
                 isComparing={isComparing}
                 isSelected={compareModels.includes(model.id)}
