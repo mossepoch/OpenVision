@@ -7,11 +7,6 @@ import ImageList from './components/ImageList';
 import CategoryManager, { Category } from './components/CategoryManager';
 import AIPreAnnotation from './components/AIPreAnnotation';
 import VideoFrameExtractor from './components/VideoFrameExtractor';
-import {
-  MOCK_ANNOTATION_IMAGES,
-  MOCK_ANNOTATIONS,
-  DEFAULT_CATEGORIES,
-} from '../../mocks/annotationData';
 import { datasetsApi, type Dataset, type YoloLabel } from '../../api/datasets';
 
 type Tool = 'draw' | 'select';
@@ -26,6 +21,16 @@ interface AnnotationImage {
   annotationCount: number;
   status: string;
 }
+
+/** Fallback categories when no dataset is selected */
+const DEFAULT_CATEGORIES = [
+  { id: 'cat-1', name: 'helmet', color: '#ef4444' },
+  { id: 'cat-2', name: 'glove', color: '#f97316' },
+  { id: 'cat-3', name: 'wrench', color: '#eab308' },
+  { id: 'cat-4', name: 'bolt', color: '#22c55e' },
+  { id: 'cat-5', name: 'tool_box', color: '#06b6d4' },
+  { id: 'cat-6', name: 'engine_part', color: '#8b5cf6' },
+];
 
 /** ----------------------------------------------------------------------
  *  Local storage helpers – they now return a fallback value and never
@@ -56,8 +61,8 @@ export default function AnnotationPage() {
   const navigate = useNavigate();
 
   // ---------- Images ----------
-  const [images, setImages] = useState<AnnotationImage[]>(MOCK_ANNOTATION_IMAGES);
-  const [selectedImageId, setSelectedImageId] = useState<string>(MOCK_ANNOTATION_IMAGES[0].id);
+  const [images, setImages] = useState<AnnotationImage[]>([]);
+  const [selectedImageId, setSelectedImageId] = useState<string>('');
   // 数据集集成（用 name 作为标识）
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [activeDatasetName, setActiveDatasetName] = useState<string | null>(null);
@@ -84,7 +89,7 @@ export default function AnnotationPage() {
           annotationCount: img.has_labels ? 1 : 0,
           status: img.has_labels ? 'labeled' : 'unlabeled',
         }));
-        setImages(annotationImages.length > 0 ? annotationImages : MOCK_ANNOTATION_IMAGES);
+        setImages(annotationImages);
         if (annotationImages.length > 0) setSelectedImageId(annotationImages[0].id);
       })
       .catch(() => {})
@@ -92,13 +97,7 @@ export default function AnnotationPage() {
   }, [activeDatasetName, datasets]);
 
   // ---------- Annotations ----------
-  const [allAnnotations, setAllAnnotations] = useState<Record<string, BBox[]>>(() => {
-    const init: Record<string, BBox[]> = {};
-    MOCK_ANNOTATION_IMAGES.forEach((img) => {
-      init[img.id] = (MOCK_ANNOTATIONS[img.id] ?? []).map((a) => ({ ...a }));
-    });
-    return init;
-  });
+  const [allAnnotations, setAllAnnotations] = useState<Record<string, BBox[]>>({});
 
   // ---------- History (undo/redo) ----------
   const historyRef = useRef<Record<string, BBox[]>[]>([]);

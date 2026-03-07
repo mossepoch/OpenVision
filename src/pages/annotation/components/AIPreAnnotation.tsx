@@ -1,9 +1,26 @@
 
 import { useState } from 'react';
-import { YOLO_CLASSES } from '../../../mocks/annotationData';
 import { BBox } from './AnnotationCanvas';
 import { Category } from './CategoryManager';
 import { api as apiClient } from '../../../api/client';
+
+/** Standard YOLO/COCO class names + custom industrial classes */
+const YOLO_CLASSES = [
+  'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',
+  'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
+  'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
+  'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+  'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove',
+  'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
+  'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
+  'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+  'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse',
+  'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+  'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
+  'toothbrush',
+  'helmet', 'glove', 'wrench', 'bolt', 'tool_box', 'engine_part', 'cable',
+  'safety_vest', 'goggles', 'boots',
+];
 
 interface AIPreAnnotationProps {
   categories: Category[];
