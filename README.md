@@ -1,81 +1,105 @@
 # OpenVision
 
-OpenVision 是一个面向工业/安防/零售等场景的视觉智能平台前端项目，涵盖摄像头接入、实时监控、数据标注、模型训练、告警与报表等全链路模块，提供现代化的控制台与门户体验。
+**The open-source, self-hosted AI camera platform.**
 
-<img width="1920" height="934" alt="image" src="https://github.com/user-attachments/assets/2bf6801a-ff60-49d9-ad66-3fb83bfd7d06" />
+Manage all your cameras in one place. Detect what matters. Keep your data local.
 
-## 关键特性
+![Dashboard](assets/dashboard.jpg)
 
-- 多协议摄像头接入（RTSP / ONVIF / HTTP-FLV / GB28181）
-- 实时目标检测与识别（人员/车辆/物品/行为）
-- 智能告警与事件管理（多渠道推送）
-- 数据标注与模型训练工作流
-- 云边协同推理与设备管理
-- 报表中心与合规分析
+OpenVision unifies IP cameras from any brand into a single dashboard with built-in AI — object detection, facial recognition, and behavior analysis — all running locally on your hardware. No cloud subscriptions. No vendor lock-in. No compromises.
 
-## 技术栈
+---
 
-- React 19 + TypeScript
-- Vite 7
-- Tailwind CSS
-- React Router
-- i18next 国际化
-- Recharts 数据可视化
+## Why OpenVision?
 
-## 快速开始
+- 🎯 **Unified Management** — One dashboard for every camera brand. No more juggling 5 different apps.
+- 🧠 **Built-in AI** — Person, vehicle, and object detection. Face recognition and behavior analysis on the roadmap.
+- 🔒 **Self-hosted & Private** — Your footage stays on your hardware. Period.
+- ⚡ **Easy Setup** — Web-based dashboard, no YAML config files. Add a camera in 30 seconds.
+- 🏠 **For Everyone** — From home security DIYers to small business owners.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/mossepoch/OpenVision.git
+cd OpenVision
+docker-compose up -d
+```
+
+Or run locally:
 
 ```bash
 npm install
 npm run dev
 ```
 
-默认启动地址：`http://localhost:3000`
+Default: `http://localhost:3000`
 
-## 常用脚本
+---
 
-- `npm run dev`：启动本地开发
-- `npm run build`：生产构建（输出到 `out/`）
-- `npm run preview`：本地预览生产构建
-- `npm run lint`：ESLint 校验
-- `npm run type-check`：TypeScript 类型检查
+## Screenshots
 
-## 目录结构
+### Login
+![Login](assets/login.jpg)
 
-```
-src/
-  components/feature/   # 侧边栏、顶部栏等基础组件
-  pages/                # 业务页面
-    dashboard/          # 运营看板
-    monitoring/         # 实时监控
-    devices/            # 设备管理
-    datasets/           # 数据集
-    annotation/         # 数据标注
-    training/           # 训练任务
-    models/             # 模型管理
-    reports/            # 报表中心
-    stations/           # 站点管理
-    sop-config/         # SOP 配置
-    login/              # 登录页
-    home/               # 门户首页
-  mocks/                # 演示用模拟数据
-  router/               # 路由配置
-  i18n/                 # 国际化
-```
+### Dashboard
+![Dashboard](assets/dashboard.jpg)
 
-## 环境变量
+### Real-time Monitoring
+![Monitoring](assets/monitoring.jpg)
 
-项目支持以下可选环境变量：
+### Device Management
+![Devices](assets/devices.jpg)
 
-- `BASE_PATH`：部署子路径（默认 `/`）
-- `IS_PREVIEW`：预览模式标记
-- `PROJECT_ID` / `VERSION_ID` / `READDY_AI_DOMAIN`：用于集成外部平台/服务的配置
+---
 
-示例：
+## Key Features
 
-```bash
-BASE_PATH=/openvision IS_PREVIEW=1 npm run build
-```
+- **Multi-protocol Camera Access** — RTSP / ONVIF / HTTP-FLV / GB28181
+- **Real-time Object Detection** — Person, vehicle, item, and behavior recognition
+- **Smart Alerts** — Multi-channel notifications for events
+- **Data Annotation & Training** — Built-in workflow for model improvement
+- **Edge-Cloud Synergy** — Distributed inference and device management
+- **Reports & Compliance** — Analytics and audit-ready reporting
 
-## 许可证
+---
 
-本项目基于 Apache License 2.0 开源，详见 `LICENSE`。
+## Tech Stack
+
+- **Frontend:** React 19 + TypeScript + Vite 7
+- **Styling:** Tailwind CSS
+- **State:** React Router + Context
+- **Charts:** Recharts
+- **i18n:** i18next
+
+---
+
+## Roadmap
+
+- [ ] Face recognition module
+- [ ] Behavior analysis (loitering, fall detection, etc.)
+- [ ] Mobile app (iOS/Android)
+- [ ] Home Assistant integration
+- [ ] One-click deploy scripts
+
+---
+
+## Contributing
+
+We're building in public and early stage. Your feedback shapes what we build next.
+
+- Open an issue for bugs or feature requests
+- PRs are welcome
+- Join the discussion in Discord
+
+---
+
+## License
+
+Apache License 2.0 — See [LICENSE](LICENSE) for details.
+
+---
+
+**Built with ❤️ by the OpenVision Team**
