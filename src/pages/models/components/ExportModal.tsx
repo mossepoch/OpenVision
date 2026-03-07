@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { exportFormats } from '../../../mocks/modelsData';
+
+// 导出格式定义（内置，不依赖 mock）
+const exportFormats = [
+  { value: 'pytorch', label: 'PyTorch (.pt)', description: '原生PyTorch格式，保留完整训练信息' },
+  { value: 'onnx', label: 'ONNX (.onnx)', description: '跨平台格式，支持多种推理引擎' },
+  { value: 'torchscript', label: 'TorchScript (.torchscript)', description: 'PyTorch序列化格式，适合生产部署' },
+  { value: 'openvino', label: 'OpenVINO', description: 'Intel优化格式，适合CPU推理' },
+  { value: 'tensorrt', label: 'TensorRT', description: 'NVIDIA优化格式，GPU推理性能最佳' },
+  { value: 'coreml', label: 'CoreML', description: 'Apple设备专用格式' },
+  { value: 'tflite', label: 'TensorFlow Lite', description: '移动端和嵌入式设备格式' },
+];
 
 interface ExportModalProps {
   modelName: string;
