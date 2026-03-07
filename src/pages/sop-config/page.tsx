@@ -1,6 +1,35 @@
-import { sopTemplates, stepTypes, sampleSopSteps } from '../../mocks/sopData';
 import { useState, useEffect } from 'react';
 import { sopApi, Sop } from '../../api/sop';
+
+// SOP 模板库（静态配置，不依赖 API）
+const sopTemplates = [
+  { id: 'template-001', name: '发动机组装标准流程', category: '装配', steps: 8, avgDuration: '45分钟', description: '适用于四缸发动机的标准组装流程', usage: 156 },
+  { id: 'template-002', name: '变速箱装配流程', category: '装配', steps: 10, avgDuration: '60分钟', description: '手动变速箱装配标准操作流程', usage: 98 },
+  { id: 'template-003', name: '底盘组装流程', category: '装配', steps: 6, avgDuration: '35分钟', description: '车辆底盘系统组装标准流程', usage: 124 },
+  { id: 'template-004', name: '电气系统安装', category: '装配', steps: 7, avgDuration: '40分钟', description: '车辆电气系统安装与测试流程', usage: 87 },
+  { id: 'template-005', name: '质量检验流程', category: '质检', steps: 5, avgDuration: '20分钟', description: '成品质量检验标准流程', usage: 203 },
+  { id: 'template-006', name: '安全检查流程', category: '安全', steps: 4, avgDuration: '15分钟', description: '作业前安全检查标准流程', usage: 312 },
+];
+
+const stepTypes = [
+  { id: 'assembly', name: '组装步骤', icon: 'ri-tools-line', color: 'blue' },
+  { id: 'inspection', name: '检查步骤', icon: 'ri-search-eye-line', color: 'green' },
+  { id: 'testing', name: '测试步骤', icon: 'ri-test-tube-line', color: 'purple' },
+  { id: 'safety', name: '安全检查', icon: 'ri-shield-check-line', color: 'red' },
+  { id: 'quality', name: '质量确认', icon: 'ri-checkbox-circle-line', color: 'orange' },
+  { id: 'documentation', name: '记录步骤', icon: 'ri-file-text-line', color: 'gray' },
+];
+
+const sampleSopSteps = [
+  { id: 'step-001', order: 1, type: 'safety', name: '安全检查', description: '检查操作员是否佩戴安全手套、护目镜等防护装备', timeout: 60, required: true, prompt: '请确认操作员是否正确佩戴了所有必需的个人防护装备。' },
+  { id: 'step-002', order: 2, type: 'assembly', name: '准备工具和零件', description: '从工具架取出所需工具，从料架取出对应零件', timeout: 120, required: true, prompt: '请确认操作员已从指定位置取出所有必需的工具和零件。' },
+  { id: 'step-003', order: 3, type: 'assembly', name: '安装气缸盖', description: '将气缸盖对准定位销，按照对角线顺序拧紧螺栓', timeout: 300, required: true, prompt: '请确认气缸盖已正确对准定位销，螺栓按照对角线顺序拧紧。' },
+  { id: 'step-004', order: 4, type: 'inspection', name: '检查螺栓扭矩', description: '使用扭矩扳手检查所有螺栓是否达到规定扭矩值', timeout: 180, required: true, prompt: '请确认操作员使用扭矩扳手检查了所有螺栓。' },
+  { id: 'step-005', order: 5, type: 'assembly', name: '安装凸轮轴', description: '涂抹润滑油后安装凸轮轴，确保轴承座正确就位', timeout: 240, required: true, prompt: '请确认凸轮轴已涂抹润滑油，正确安装到位。' },
+  { id: 'step-006', order: 6, type: 'testing', name: '旋转测试', description: '手动旋转曲轴，检查是否有卡滞现象', timeout: 120, required: true, prompt: '请确认操作员手动旋转了曲轴，旋转顺畅无卡滞。' },
+  { id: 'step-007', order: 7, type: 'quality', name: '质量确认', description: '对照检查清单确认所有步骤完成且符合质量标准', timeout: 180, required: true, prompt: '请确认操作员对照检查清单完成了所有项目的确认。' },
+  { id: 'step-008', order: 8, type: 'documentation', name: '记录与归档', description: '扫描二维码记录完成信息，工具归位', timeout: 90, required: true, prompt: '请确认操作员已扫描二维码记录信息，所有工具已归位。' },
+];
 
 export default function SopConfigPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
