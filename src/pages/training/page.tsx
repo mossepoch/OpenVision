@@ -1,276 +1,290 @@
-import { useState } from 'react';
-import { trainingTasks, TrainingTask } from '../../mocks/trainingData';
-import TaskListItem from './components/TaskListItem';
-import TaskDetailPanel from './components/TaskDetailPanel';
-import NewTaskForm, { NewTaskPayload } from './components/NewTaskForm';
+import { useState, useEffect, useCallback } from 'react';
+import { trainingApi, type TrainingJob, type TrainedModel } from '../../api/training';
+import { datasetsApi, type Dataset } from '../../api/datasets';
 
-type FilterStatus = 'all' | 'running' | 'queued' | 'completed' | 'failed';
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
+  pending: { label: '等待中', color: 'text-gray-500',   bg: 'bg-gray-100' },
+  running: { label: '训练中', color: 'text-blue-600',   bg: 'bg-blue-50' },
+  done:    { label: '已完成', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  error:   { label: '失败',   color: 'text-red-500',    bg: 'bg-red-50' },
+};
 
 export default function TrainingPage() {
-  const [tasks, setTasks] = useState<TrainingTask[]>(trainingTasks);
-  const [selectedId, setSelectedId] = useState<string>(trainingTasks[0]?.id ?? '');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  // 数据集列表
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  // 训练参数
+  const [params, setParams] = useState({
+    dataset_name: '',
+    epochs: 10,
+    imgsz: 640,
+    batch: 16,
+    model_base: 'yolov8n.pt',
+  });
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
 
-  const selectedTask = tasks.find(t => t.id === selectedId) ?? null;
+  // 任务列表
+  const [jobs, setJobs] = useState<TrainingJob[]>([]);
+  const [models, setModels] = useState<TrainedModel[]>([]);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
-  const filtered = tasks.filter(t => filterStatus === 'all' || t.status === filterStatus);
+  // 加载数据集
+  useEffect(() => {
+    datasetsApi.list().then(ds => {
+      setDatasets(ds);
+      if (ds.length > 0 && !params.dataset_name) {
+        setParams(p => ({ ...p, dataset_name: ds[0].name }));
+      }
+    }).catch(() => {});
+  }, []);
 
-  const stats = {
-    total: tasks.length,
-    running: tasks.filter(t => t.status === 'running').length,
-    queued: tasks.filter(t => t.status === 'queued').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    failed: tasks.filter(t => t.status === 'failed').length,
-  };
+  // 加载任务列表 + 模型
+  const fetchJobs = useCallback(() => {
+    trainingApi.listJobs().then(setJobs).catch(() => {});
+    trainingApi.listModels().then(setModels).catch(() => {});
+  }, []);
 
-  const handleStop = (taskId: string) => {
-    setTasks(prev =>
-      prev.map(t =>
-        t.id === taskId
-          ? { ...t, status: 'stopped' as const, endTime: new Date().toLocaleString() }
-          : t
-      )
-    );
-  };
+  useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
-  const handleDelete = (taskId: string) => {
-    setDeleteConfirm(taskId);
-  };
+  // 轮询活跃任务进度（5s）
+  useEffect(() => {
+    if (!activeJobId) return;
+    const timer = setInterval(() => {
+      trainingApi.getJob(activeJobId).then(job => {
+        setJobs(prev => prev.map(j => j.job_id === job.job_id ? job : j));
+        if (job.status === 'done' || job.status === 'error') {
+          setActiveJobId(null);
+          trainingApi.listModels().then(setModels).catch(() => {});
+        }
+      }).catch(() => {});
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeJobId]);
 
-  const confirmDelete = () => {
-    if (!deleteConfirm) return;
-    setTasks(prev => prev.filter(t => t.id !== deleteConfirm));
-    if (selectedId === deleteConfirm) {
-      const remaining = tasks.filter(t => t.id !== deleteConfirm);
-      setSelectedId(remaining[0]?.id ?? '');
+  const handleStart = async () => {
+    if (!params.dataset_name) { setStartError('请选择数据集'); return; }
+    setStarting(true);
+    setStartError('');
+    try {
+      const job = await trainingApi.startTrain(params);
+      setJobs(prev => [job, ...prev]);
+      setActiveJobId(job.job_id);
+    } catch (e: unknown) {
+      setStartError(e instanceof Error ? e.message : '启动失败');
+    } finally {
+      setStarting(false);
     }
-    setDeleteConfirm(null);
   };
 
-  const handleNewTask = (payload: NewTaskPayload) => {
-    const newTask: TrainingTask = {
-      id: `task-${Date.now()}`,
-      name: payload.name,
-      datasetId: payload.datasetId,
-      datasetName: payload.datasetName,
-      baseModel: payload.baseModel,
-      status: 'queued',
-      progress: 0,
-      currentEpoch: 0,
-      totalEpochs: payload.epochs,
-      startTime: new Date().toLocaleString(),
-      duration: '等待中',
-      params: {
-        epochs: payload.epochs,
-        batchSize: payload.batchSize,
-        learningRate: payload.learningRate,
-        imgSize: payload.imgSize,
-        optimizer: payload.optimizer,
-        device: 'GPU 0',
-      },
-      logs: [
-        `[${new Date().toLocaleTimeString()}] 任务已加入训练队列，等待 GPU 资源...`,
-        `[${new Date().toLocaleTimeString()}] 当前队列位置: 第 ${stats.queued + 1} 位`,
-      ],
-      lossHistory: [],
-    };
-    setTasks(prev => [newTask, ...prev]);
-    setSelectedId(newTask.id);
-    setShowNewForm(false);
-  };
-
-  const filterTabs: { key: FilterStatus; label: string; count: number }[] = [
-    { key: 'all', label: '全部', count: stats.total },
-    { key: 'running', label: '训练中', count: stats.running },
-    { key: 'queued', label: '排队中', count: stats.queued },
-    { key: 'completed', label: '已完成', count: stats.completed },
-    { key: 'failed', label: '失败', count: stats.failed },
-  ];
+  const activeJob = jobs.find(j => j.job_id === activeJobId) ?? jobs.find(j => j.status === 'running');
 
   return (
-    <div className="flex flex-col h-full p-5 gap-4 min-h-0">
+    <div className="p-6 space-y-5">
       {/* Header */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[20px] font-semibold text-gray-900 mb-1">模型训练</h1>
-            <p className="text-[13px] text-gray-400">
-              异步训练任务管理，实时查看训练进度与结果
-            </p>
-          </div>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="flex items-center gap-2 px-5 py-2.5 text-[13px] text-white bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 rounded-xl transition-all shadow-sm hover:shadow-md cursor-pointer whitespace-nowrap"
-          >
-            <i className="ri-add-line text-[16px]"></i>
-            新建训练任务
-          </button>
-        </div>
+      <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+        <h1 className="text-[20px] font-bold text-gray-900 mb-1">模型训练</h1>
+        <p className="text-[13px] text-gray-400">基于标注数据集训练自定义 YOLO 检测模型</p>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-5 gap-3 flex-shrink-0">
-        {[
-          {
-            label: '任务总数',
-            value: stats.total,
-            icon: 'ri-list-check-2',
-            color: 'text-purple-600',
-            bg: 'bg-purple-50',
-          },
-          {
-            label: '训练中',
-            value: stats.running,
-            icon: 'ri-loader-4-line',
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-50',
-          },
-          {
-            label: '排队中',
-            value: stats.queued,
-            icon: 'ri-time-line',
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
-          },
-          {
-            label: '已完成',
-            value: stats.completed,
-            icon: 'ri-checkbox-circle-line',
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-50',
-          },
-          {
-            label: '失败',
-            value: stats.failed,
-            icon: 'ri-close-circle-line',
-            color: 'text-red-500',
-            bg: 'bg-red-50',
-          },
-        ].map(s => (
-          <div
-            key={s.label}
-            className="bg-white border border-gray-100 rounded-2xl p-3.5 flex items-center gap-3 shadow-sm"
-          >
-            <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center flex-shrink-0`}>
-              <i className={`${s.icon} ${s.color} text-[18px]`}></i>
-            </div>
-            <div>
-              <div className="text-[20px] font-semibold text-gray-900 leading-tight">{s.value}</div>
-              <div className="text-[11px] text-gray-400">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="grid grid-cols-5 gap-5">
+        {/* 左侧：训练配置 */}
+        <div className="col-span-2 space-y-4">
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <h2 className="text-[14px] font-bold text-gray-800 mb-4">训练配置</h2>
+            <div className="space-y-3">
+              {/* 数据集 */}
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-1.5">数据集</label>
+                <select
+                  value={params.dataset_name}
+                  onChange={e => setParams(p => ({ ...p, dataset_name: e.target.value }))}
+                  className="w-full h-9 px-3 text-[13px] border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400 cursor-pointer"
+                >
+                  <option value="">— 选择数据集 —</option>
+                  {datasets.map(d => (
+                    <option key={d.name} value={d.name}>{d.name}（{d.image_count} 张）</option>
+                  ))}
+                </select>
+              </div>
 
-      {/* Main Content */}
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* Left: Task List */}
-        <div className="w-[300px] flex-shrink-0 flex flex-col min-h-0">
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1.5 bg-gray-50 rounded-xl p-1 mb-3 flex-shrink-0">
-            {filterTabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setFilterStatus(tab.key)}
-                className={`flex-1 flex items-center justify-center gap-1 py-2 text-[11px] rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  filterStatus === tab.key
-                    ? 'bg-purple-600 text-white font-medium shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white'
-                }`}
-              >
-                {tab.label}
-                {tab.count > 0 && (
-                  <span
-                    className={`text-[9px] px-1.5 rounded-full ${
-                      filterStatus === tab.key ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-500'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+              {/* 基础模型 */}
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-1.5">基础模型</label>
+                <select
+                  value={params.model_base}
+                  onChange={e => setParams(p => ({ ...p, model_base: e.target.value }))}
+                  className="w-full h-9 px-3 text-[13px] border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400 cursor-pointer"
+                >
+                  <option value="yolov8n.pt">YOLOv8n（最快，精度低）</option>
+                  <option value="yolov8s.pt">YOLOv8s（均衡）</option>
+                  <option value="yolov8m.pt">YOLOv8m（精度高，较慢）</option>
+                </select>
+              </div>
 
-          {/* Task List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {filtered.length > 0 ? (
-              filtered.map(task => (
-                <TaskListItem
-                  key={task.id}
-                  task={task}
-                  isSelected={selectedId === task.id}
-                  onSelect={t => setSelectedId(t.id)}
-                  onStop={handleStop}
-                  onDelete={handleDelete}
+              {/* Epochs */}
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-1.5">训练轮数 (epochs)</label>
+                <input type="number" min={1} max={300} value={params.epochs}
+                  onChange={e => setParams(p => ({ ...p, epochs: Number(e.target.value) }))}
+                  className="w-full h-9 px-3 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-violet-400"
                 />
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                <div className="w-12 h-12 flex items-center justify-center mb-3">
-                  <i className="ri-cpu-line text-[36px] text-gray-200"></i>
-                </div>
-                <p className="text-[12px] text-gray-400">暂无训练任务</p>
+                <p className="text-[11px] text-gray-400 mt-1">推荐 10-100，越多越准但越慢</p>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Right: Detail Panel */}
-        <div className="flex-1 min-h-0 min-w-0">
-          {selectedTask ? (
-            <TaskDetailPanel task={selectedTask} onStop={handleStop} onDelete={handleDelete} />
-          ) : (
-            <div className="h-full bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-gray-400">
-              <div className="w-16 h-16 flex items-center justify-center mb-4">
-                <i className="ri-cpu-line text-[48px] text-gray-200"></i>
+              {/* imgsz */}
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-1.5">图像尺寸 (imgsz)</label>
+                <select value={params.imgsz}
+                  onChange={e => setParams(p => ({ ...p, imgsz: Number(e.target.value) }))}
+                  className="w-full h-9 px-3 text-[13px] border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400 cursor-pointer"
+                >
+                  <option value={320}>320（快）</option>
+                  <option value={640}>640（推荐）</option>
+                  <option value={1280}>1280（高精度，慢）</option>
+                </select>
               </div>
-              <p className="text-[13px] font-medium text-gray-500 mb-1">选择一个训练任务</p>
-              <p className="text-[11px] text-gray-400">点击左侧任务查看详情</p>
+
+              {/* Batch */}
+              <div>
+                <label className="block text-[12px] text-gray-500 mb-1.5">批大小 (batch)</label>
+                <input type="number" min={1} max={64} value={params.batch}
+                  onChange={e => setParams(p => ({ ...p, batch: Number(e.target.value) }))}
+                  className="w-full h-9 px-3 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-violet-400"
+                />
+              </div>
+
+              {startError && (
+                <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-[12px] text-red-500">
+                  ⚠ {startError}
+                </div>
+              )}
+
+              <button
+                onClick={handleStart}
+                disabled={starting || !!activeJob}
+                className="w-full h-10 text-white text-[13px] font-semibold rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)' }}
+              >
+                {starting ? '启动中...' : activeJob ? '训练进行中...' : '🚀 开始训练'}
+              </button>
+            </div>
+          </div>
+
+          {/* 已训练模型 */}
+          {models.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <h2 className="text-[14px] font-bold text-gray-800 mb-3">已训练模型</h2>
+              <div className="space-y-2">
+                {models.map(m => (
+                  <div key={m.name} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="text-[12px] font-medium text-gray-700">{m.name}</div>
+                      <div className="text-[11px] text-gray-400">{m.size_mb.toFixed(1)} MB</div>
+                    </div>
+                    <span className="text-[11px] text-gray-400">
+                      {new Date(m.created_at * 1000).toLocaleDateString('zh-CN')}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* New Task Form Modal */}
-      {showNewForm && <NewTaskForm onClose={() => setShowNewForm(false)} onSubmit={handleNewTask} />}
-
-      {/* Delete Confirm Modal */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteConfirm(null)}></div>
-          <div className="relative bg-white rounded-2xl shadow-2xl w-[380px] p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-                <i className="ri-delete-bin-line text-red-500 text-[20px]"></i>
+        {/* 右侧：进度 + 历史 */}
+        <div className="col-span-3 space-y-4">
+          {/* 当前任务进度 */}
+          {activeJob && (
+            <div className="bg-white rounded-2xl p-5 border border-violet-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[14px] font-bold text-gray-800">训练进度</h2>
+                <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${STATUS_MAP[activeJob.status]?.bg} ${STATUS_MAP[activeJob.status]?.color}`}>
+                  {STATUS_MAP[activeJob.status]?.label}
+                </span>
               </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-gray-900">确认删除任务</h3>
-                <p className="text-[11px] text-gray-400">此操作不可撤销</p>
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-[12px] text-gray-500 mb-1.5">
+                  <span>{activeJob.message}</span>
+                  <span className="font-semibold text-violet-600">{activeJob.progress.toFixed(0)}%</span>
+                </div>
+                <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-violet-500 to-purple-400 rounded-full transition-all duration-500"
+                    style={{ width: `${activeJob.progress}%` }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-[12px]">
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <div className="text-gray-400 mb-0.5">数据集</div>
+                  <div className="font-medium text-gray-700">{activeJob.dataset}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <div className="text-gray-400 mb-0.5">轮数</div>
+                  <div className="font-medium text-gray-700">{activeJob.epochs}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <div className="text-gray-400 mb-0.5">基础模型</div>
+                  <div className="font-medium text-gray-700">{activeJob.model_base}</div>
+                </div>
               </div>
             </div>
-            <p className="text-[12px] text-gray-600 mb-5 bg-red-50 rounded-xl p-3">
-              删除后，该任务的训练日志、训练曲线及结果数据将全部清除。
-            </p>
-            <div className="flex items-center gap-2 justify-end">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-[12px] text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-              >
-                取消
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 text-[12px] text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-              >
-                确认删除
-              </button>
+          )}
+
+          {/* 任务历史 */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-[14px] font-bold text-gray-800">任务历史</h2>
+              <button onClick={fetchJobs} className="text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">刷新</button>
             </div>
+            {jobs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <i className="ri-history-line text-[40px] mb-3"></i>
+                <p className="text-[13px]">暂无训练任务</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {['任务 ID', '数据集', '轮数', '进度', '状态', '时间'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.map(job => {
+                    const s = STATUS_MAP[job.status] ?? STATUS_MAP.pending;
+                    return (
+                      <tr key={job.job_id}
+                        className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => job.status === 'running' && setActiveJobId(job.job_id)}
+                      >
+                        <td className="px-4 py-3 text-[12px] font-mono text-gray-400">{job.job_id.slice(-8)}</td>
+                        <td className="px-4 py-3 text-[12px] text-gray-700">{job.dataset}</td>
+                        <td className="px-4 py-3 text-[12px] text-gray-600">{job.epochs}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 rounded-full" style={{ width: `${job.progress}%` }} />
+                            </div>
+                            <span className="text-[11px] text-gray-400 w-8">{job.progress.toFixed(0)}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${s.bg} ${s.color}`}>{s.label}</span>
+                        </td>
+                        <td className="px-4 py-3 text-[11px] text-gray-400 whitespace-nowrap">
+                          {new Date(job.started_at * 1000).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

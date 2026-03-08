@@ -17,6 +17,13 @@ interface Props {
   hourlyData: HourlyPoint[];
 }
 
+// 空数据占位
+const EMPTY_COMPLIANCE: CompliancePoint[] = [
+  { date: '-', compliance: 0, tasks: 0 },
+  { date: '-', compliance: 0, tasks: 0 },
+];
+const EMPTY_HOURLY: HourlyPoint[] = [];
+
 type Tab = 'compliance' | 'hourly';
 
 interface TooltipInfo {
@@ -32,7 +39,9 @@ const LINE_COLORS = {
   alerts: '#f97316',
 };
 
-export default function MiniComplianceChart({ data, hourlyData }: Props) {
+export default function MiniComplianceChart({ data: rawData, hourlyData: rawHourlyData }: Props) {
+  const data = rawData.length >= 2 ? rawData : EMPTY_COMPLIANCE;
+  const hourlyData = rawHourlyData.length > 0 ? rawHourlyData : EMPTY_HOURLY;
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 400, height: 150 });
   const [activeTab, setActiveTab] = useState<Tab>('compliance');
@@ -69,8 +78,8 @@ export default function MiniComplianceChart({ data, hourlyData }: Props) {
   const minT = 0;
   const rangeT = maxT - minT || 1;
 
-  // mock alerts per day
-  const alertsData = [3, 5, 2, 4, 6, 3, 5];
+  // alerts from tasks data (use tasks as proxy for alerts count)
+  const alertsData = data.map(d => Math.max(0, Math.round(d.tasks * 0.15)));
 
   const maxA = Math.max(...alertsData);
   const minA = 0;

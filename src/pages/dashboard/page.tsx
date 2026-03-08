@@ -1,37 +1,161 @@
-
-import { useState } from 'react';
-import { dashboardData } from '../../mocks/dashboardData';
-import { complianceTrendData, alertDistribution, stationPerformance, hourlyDistribution } from '../../mocks/reportsData';
+import { useState, useEffect } from 'react';
 import RunningTasksSection from './components/RunningTasksSection';
 import RecentAlertsSection from './components/RecentAlertsSection';
 import MiniComplianceChart from './components/MiniComplianceChart';
 import MiniAlertChart from './components/MiniAlertChart';
 import StationRankingSection from './components/StationRankingSection';
-
-function MiniBar({ data, color }: { data: number[]; color: string }) {
-  const max = Math.max(...data);
-  return (
-    <div className="flex items-end gap-[2px] h-8">
-      {data.map((v, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-sm opacity-80"
-          style={{ height: `${(v / max) * 100}%`, backgroundColor: color }}
-        />
-      ))}
-    </div>
-  );
-}
+import { dashboardApi, type DashboardData } from '../../api/dashboard';
+import { reportsApi, type ReportSummary, type TrendPoint } from '../../api/reports';
+import { stationsApi, type Station } from '../../api/stations';
 
 export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
+  const [apiData, setApiData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reportSummary, setReportSummary] = useState<ReportSummary | null>(null);
+  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
 
-  const { stats } = dashboardData;
+  useEffect(() => {
+    Promise.all([
+      dashboardApi.get().catch(() => null),
+      reportsApi.summary(timeRange).catch(() => null),
+      reportsApi.trend(7).catch(() => []),
+      stationsApi.list().catch(() => []),
+    ]).then(([dashboard, summary, trend, stationList]) => {
+      setApiData(dashboard);
+      setReportSummary(summary);
+      setTrendData(trend as TrendPoint[]);
+      setStations(stationList as Station[]);
+    }).finally(() => setLoading(false));
+  }, [timeRange]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    Promise.all([
+      dashboardApi.get().catch(() => null),
+      reportsApi.summary(timeRange).catch(() => null),
+      reportsApi.trend(7).catch(() => []),
+      stationsApi.list().catch(() => []),
+    ]).then(([dashboard, summary, trend, stationList]) => {
+      setApiData(dashboard);
+      setReportSummary(summary);
+      setTrendData(trend as TrendPoint[]);
+      setStations(stationList as Station[]);
+    }).finally(() => setLoading(false));
+  };
+
+  // 统计卡片数据
+  const stats = {
+    onlineDevices: apiData?.devices?.online ?? 0,
+    totalDevices: apiData?.devices?.total ?? 0,
+    runningTasks: (apiData as any)?.running_detections ?? 0,
+    pendingAlerts: apiData?.alerts?.unread ?? 0,
+    avgCompliance: reportSummary?.compliance_rate ?? 0,
+  };
+
+  // 告警列表
+  const recentAlerts = (apiData?.recent_alerts ?? []).map(a => ({
+    id: String(a.id),
+    type: a.severity === 'critical' || a.severity === 'high' ? 'error' : 'warning',
+    severity: a.severity,
+    title: a.alert_type,
+    description: a.message,
+    time: new Date(a.created_at).toLocaleString('zh-CN'),
+    station: `设备-${a.device_id}`,
+    status: 'pending',
+    sopName: '',
+  }));
+
+  // 合规趋势数据 - 从 trendData 转换
+  const complianceTrendData = trendData.map(t => ({
+    date: t.date.slice(5), // MM-DD
+    compliance: reportSummary?.compliance_rate ?? 0,
+    tasks: t.count,
+  }));
+
+  // 告警分布 - 从 reportSummary.by_type
+  const alertDistribution = reportSummary?.by_type
+    ? Object.entries(reportSummary.by_type).map(([type, count], i) => {
+        const colors = ['#ef4444', '#f97316', '#eab308', '#0052d9', '#8b5cf6', '#ec4899'];
+        const total = Object.values(reportSummary.by_type).reduce((s, c) => s + c, 0);
+        return {
+          type,
+          count,
+          color: colors[i % colors.length],
+          percent: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
+        };
+      })
+    : [];
+
+  // 时段分布 - 从 reportSummary.hourly
+  const hourlyDistribution = reportSummary?.hourly
+    ? Object.entries(reportSummary.hourly).map(([hour, count]) => ({
+        hour: hour.padStart(2, '0') + ':00',
+        count,
+      }))
+    : [];
+
+  // 工位排行 - 从 stations 数据
+  const stationPerformance = stations.map(s => ({
+    station: s.name,
+    compliance: s.compliance7d ?? 0,
+    tasks: s.totalTasks ?? 0,
+    alerts: s.alert_count ?? 0,
+    operator: '',
+    avgDuration: 0,
+  }));
+
+  // 运行中任务 - 后端暂无具体任务列表，用空数组
+  const runningTasks = (apiData as any)?.running_tasks ?? [];
 
   const timeRangeOptions = [
     { key: 'today' as const, label: '今日' },
     { key: 'week' as const, label: '本周' },
     { key: 'month' as const, label: '本月' },
+  ];
+
+  const statCards = [
+    {
+      label: '在线工位',
+      value: stats.onlineDevices,
+      total: stats.totalDevices,
+      icon: 'ri-computer-line',
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-50',
+      trend: stats.totalDevices > 0 ? Number(((stats.onlineDevices / stats.totalDevices) * 100).toFixed(1)) : 0,
+      trendUp: true,
+    },
+    {
+      label: '运行任务',
+      value: stats.runningTasks,
+      total: null,
+      icon: 'ri-play-circle-line',
+      color: 'text-violet-500',
+      bg: 'bg-violet-50',
+      trend: 0,
+      trendUp: true,
+    },
+    {
+      label: '今日告警',
+      value: stats.pendingAlerts,
+      total: null,
+      icon: 'ri-alarm-warning-line',
+      color: 'text-orange-500',
+      bg: 'bg-orange-50',
+      trend: 0,
+      trendUp: false,
+    },
+    {
+      label: '平均合规率',
+      value: stats.avgCompliance,
+      total: null,
+      icon: 'ri-shield-check-line',
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-50',
+      trend: 0,
+      trendUp: true,
+    },
   ];
 
   return (
@@ -58,73 +182,37 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          <button className="h-9 px-3 text-[13px] text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 shadow-sm">
-            <i className="ri-refresh-line text-[14px]"></i>
+          <button
+            onClick={handleRefresh}
+            className="h-9 px-3 text-[13px] text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 shadow-sm"
+          >
             刷新
           </button>
           <button className="h-9 px-3 text-[13px] text-white bg-[#7c3aed] hover:bg-[#6d28d9] rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 shadow-sm">
-            <i className="ri-download-line text-[14px]"></i>
             导出报告
           </button>
         </div>
       </div>
 
+      {/* 加载提示 */}
+      {loading && (
+        <div className="text-center text-[13px] text-gray-400 py-2">数据加载中...</div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4">
-        {[
-          {
-            label: '在线工位',
-            value: stats.onlineDevices,
-            total: stats.totalDevices,
-            icon: 'ri-computer-line',
-            color: 'text-emerald-500',
-            bg: 'bg-emerald-50',
-            trend: 5.2,
-            trendUp: true,
-          },
-          {
-            label: '运行任务',
-            value: stats.runningTasks,
-            total: null,
-            icon: 'ri-play-circle-line',
-            color: 'text-violet-500',
-            bg: 'bg-violet-50',
-            trend: 8.1,
-            trendUp: true,
-          },
-          {
-            label: '今日告警',
-            value: stats.pendingAlerts,
-            total: null,
-            icon: 'ri-alarm-warning-line',
-            color: 'text-orange-500',
-            bg: 'bg-orange-50',
-            trend: 3.4,
-            trendUp: false,
-          },
-          {
-            label: '平均合规率',
-            value: stats.avgCompliance,
-            total: null,
-            icon: 'ri-shield-check-line',
-            color: 'text-emerald-500',
-            bg: 'bg-emerald-50',
-            trend: 2.3,
-            trendUp: true,
-          },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm"
-          >
+        {statCards.map((stat) => (
+          <div key={stat.label} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <div className="flex items-start justify-between mb-3">
               <div className={`w-11 h-11 rounded-xl ${stat.bg} flex items-center justify-center`}>
                 <i className={`${stat.icon} ${stat.color} text-[20px]`}></i>
               </div>
-              <div className={`flex items-center gap-1 text-[12px] font-medium ${stat.trendUp ? 'text-emerald-500' : 'text-orange-500'}`}>
-                <i className={`${stat.trendUp ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-[14px]`}></i>
-                {stat.trend}%
-              </div>
+              {stat.trend > 0 && (
+                <div className={`flex items-center gap-1 text-[12px] font-medium ${stat.trendUp ? 'text-emerald-500' : 'text-orange-500'}`}>
+                  <i className={`${stat.trendUp ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-[14px]`}></i>
+                  {stat.trend}%
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <div className="text-[13px] font-medium text-gray-500">{stat.label}</div>
@@ -136,7 +224,7 @@ export default function Dashboard() {
                   <span className="text-[14px] text-gray-400">/ {stat.total}</span>
                 )}
               </div>
-              {stat.total !== null && (
+              {stat.total !== null && stat.total > 0 && (
                 <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 rounded-full transition-all duration-500"
@@ -149,7 +237,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Middle Row: Compliance Chart + Alert Donut */}
+      {/* Middle Row */}
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2" style={{ height: 220 }}>
           <MiniComplianceChart data={complianceTrendData} hourlyData={hourlyDistribution} />
@@ -159,13 +247,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Bottom Row: Running Tasks + Recent Alerts */}
+      {/* Bottom Row */}
       <div className="grid grid-cols-5 gap-4 items-stretch">
         <div className="col-span-3">
-          <RunningTasksSection tasks={dashboardData.runningTasks} />
+          <RunningTasksSection tasks={runningTasks} />
         </div>
         <div className="col-span-2 flex flex-col">
-          <RecentAlertsSection alerts={dashboardData.recentAlerts} />
+          <RecentAlertsSection alerts={recentAlerts} />
         </div>
       </div>
 

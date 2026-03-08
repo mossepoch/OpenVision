@@ -335,7 +335,7 @@
   letter-spacing: 0.06px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 640px) {
   .leftPanel {
     display: none;
   }

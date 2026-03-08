@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { reportsStats } from '../../mocks/reportsData';
+import { useState, useEffect } from 'react';
+import { reportsApi, ReportSummary } from '../../api/reports';
 import ComplianceTrendChart from './components/ComplianceTrendChart';
 import AlertDistributionChart from './components/AlertDistributionChart';
 import StationRanking from './components/StationRanking';
@@ -9,6 +9,11 @@ import TaskDetailTable from './components/TaskDetailTable';
 export default function ReportsPage() {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
   const [searchQuery, setSearchQuery] = useState('');
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
+
+  useEffect(() => {
+    reportsApi.summary(timeRange).then(setSummary).catch(console.error);
+  }, [timeRange]);
 
   const timeRangeOptions = [
     { key: 'today' as const, label: '今日' },
@@ -56,43 +61,43 @@ export default function ReportsPage() {
       <div className="grid grid-cols-4 gap-4">
         {[
           {
-            label: '完成任务',
-            value: reportsStats.completedTasks,
-            unit: `/ ${reportsStats.totalTasks}`,
+            label: '告警总数',
+            value: summary?.total ?? '-',
+            unit: '',
             icon: 'ri-task-fill',
             color: 'text-violet-500',
             bg: 'bg-violet-50',
-            sub: `+${reportsStats.tasksTrend} 较昨日`,
-            subColor: 'text-emerald-500',
+            sub: `待处理 ${summary?.pending ?? 0} 条`,
+            subColor: 'text-orange-500',
           },
           {
-            label: '平均合规率',
-            value: reportsStats.avgCompliance,
+            label: '合规率',
+            value: summary ? `${summary.compliance_rate}` : '-',
             unit: '%',
             icon: 'ri-shield-check-fill',
             color: 'text-emerald-500',
             bg: 'bg-emerald-50',
-            sub: `+${reportsStats.complianceTrend}% 较昨日`,
+            sub: `已处理 ${summary?.resolved ?? 0} 条`,
             subColor: 'text-emerald-500',
           },
           {
-            label: '异常告警',
-            value: reportsStats.totalAlerts,
+            label: '未读告警',
+            value: summary?.unread ?? '-',
             unit: '',
             icon: 'ri-alarm-warning-fill',
             color: 'text-orange-500',
             bg: 'bg-orange-50',
-            sub: `${Math.abs(reportsStats.alertsTrend)}% 较昨日`,
+            sub: '实时统计',
             subColor: 'text-emerald-500',
           },
           {
-            label: '平均用时',
-            value: reportsStats.avgDuration,
-            unit: 'min',
+            label: '已处理',
+            value: summary?.resolved ?? '-',
+            unit: '',
             icon: 'ri-timer-fill',
             color: 'text-cyan-500',
             bg: 'bg-cyan-50',
-            sub: `${Math.abs(reportsStats.durationTrend)}min 较昨日`,
+            sub: '本期处理完成',
             subColor: 'text-emerald-500',
           },
         ].map(s => (
