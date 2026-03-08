@@ -28,6 +28,25 @@ Thumbs.db
 .idea/
 *.swp
 
+# OpenClaw workspace files (不属于项目代码)
+SOUL.md
+AGENTS.md
+BOOTSTRAP.md
+HEARTBEAT.md
+IDENTITY.md
+USER.md
+TOOLS.md
+DEVELOPMENT_GUIDE.md
+MEMORY.md
+.openclaw/
+memory/
+auto-imports.d.ts
+.env.local
+.env.example
+
+# Marketing (内部文档，不入仓库)
+marketing/
+
 # OpenVision
 openvision.db
 logs/
