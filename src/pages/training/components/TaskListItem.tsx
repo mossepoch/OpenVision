@@ -1,4 +1,4 @@
-import { TrainingTask } from '../../../mocks/trainingData';
+import { type TrainingTask } from './TaskDetailPanel';
 
 type TaskStatus = keyof typeof statusConfig;
 

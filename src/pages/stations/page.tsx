@@ -1,18 +1,21 @@
 
-import React, { useState } from 'react';
-import { stationsData } from '../../mocks/stationsData';
+import React, { useState, useEffect } from 'react';
+import { stationsApi, Station } from '../../api/stations';
 import StationCard from './components/StationCard';
 import StationConfigModal from './components/StationConfigModal';
 
-type Station = typeof stationsData[0];
-
 export default function StationsPage() {
-  const [stations, setStations] = useState<Station[]>(stationsData as Station[]);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  useEffect(() => {
+    stationsApi.list().then(setStations).catch(console.error).finally(() => setLoading(false));
+  }, []);
 
   const filtered = stations.filter((s) => {
     const matchSearch =
@@ -39,47 +42,29 @@ export default function StationsPage() {
     setShowDeleteConfirm(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (showDeleteConfirm) {
-      setStations((prev) => prev.filter((s) => s.id !== showDeleteConfirm));
+      try {
+        await stationsApi.delete(showDeleteConfirm);
+        setStations((prev) => prev.filter((s) => s.id !== showDeleteConfirm));
+      } catch (e) {
+        console.error(e);
+      }
       setShowDeleteConfirm(null);
     }
   };
 
-  const handleSave = (data: any) => {
-    if (editingStation) {
-      setStations((prev) =>
-        prev.map((s) =>
-          s.id === editingStation.id
-            ? {
-                ...s,
-                ...data,
-                sopName:
-                  data.sopId
-                    ? stationsData.find((x) => x.sopId === data.sopId)?.sopName ||
-                      editingStation.sopName
-                    : '',
-                cvModelName:
-                  data.cvModelId
-                    ? stationsData.find((x) => x.cvModelId === data.cvModelId)?.cvModelName || ''
-                    : '',
-                status: data.cameras?.length > 0 && data.sopId ? 'active' : 'inactive',
-              }
-            : s
-        )
-      );
-    } else {
-      const newStation: Station = {
-        id: `ws-${Date.now()}`,
-        ...data,
-        sopName: '',
-        cvModelName: '',
-        status: data.cameras?.length > 0 && data.sopId ? 'active' : 'inactive',
-        compliance7d: 0,
-        totalTasks: 0,
-        alertCount: 0,
-      };
-      setStations((prev) => [...prev, newStation]);
+  const handleSave = async (data: any) => {
+    try {
+      if (editingStation) {
+        const updated = await stationsApi.update(editingStation.id, data);
+        setStations((prev) => prev.map((s) => s.id === editingStation.id ? updated : s));
+      } else {
+        const created = await stationsApi.create(data);
+        setStations((prev) => [...prev, created]);
+      }
+    } catch (e) {
+      console.error(e);
     }
     setShowModal(false);
     setEditingStation(null);

@@ -1,6 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
-import { TrainingTask } from '../../../mocks/trainingData';
 import TrainingChart from './TrainingChart';
+
+// 任务类型定义（不再依赖 mock）
+export interface TrainingTask {
+  id: string;
+  name: string;
+  datasetId: string;
+  datasetName: string;
+  baseModel: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'stopped';
+  progress: number;
+  currentEpoch: number;
+  totalEpochs: number;
+  startTime: string;
+  endTime?: string;
+  duration: string;
+  params: {
+    epochs: number;
+    batchSize: number;
+    learningRate: number;
+    imgSize: number;
+    optimizer: string;
+    device: string;
+  };
+  metrics?: {
+    mAP50: number;
+    mAP5095: number;
+    precision: number;
+    recall: number;
+    boxLoss: number;
+    clsLoss: number;
+  };
+  logs: string[];
+  lossHistory: { epoch: number; trainLoss: number; valLoss: number; mAP50: number }[];
+}
 
 interface TaskDetailPanelProps {
   task: TrainingTask;

@@ -1,5 +1,6 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { datasetsApi, type DatasetImage } from '../../../api/datasets';
 
 interface Dataset {
   id: string;
@@ -45,6 +46,19 @@ export default function DatasetDetailModal({
     'overview',
   );
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
+  const [realImages, setRealImages] = useState<DatasetImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
+
+  // 加载真实图片列表
+  useEffect(() => {
+    if (activeTab === 'images' && dataset.id) {
+      setImagesLoading(true);
+      datasetsApi.listImages(dataset.id)
+        .then(res => setRealImages(res.images ?? []))
+        .catch(err => console.error('Failed to load images:', err))
+        .finally(() => setImagesLoading(false));
+    }
+  }, [activeTab, dataset.id]);
 
   const labelRate =
     dataset.imageCount > 0
@@ -56,11 +70,17 @@ export default function DatasetDetailModal({
   const valPct = splitTotal > 0 ? Math.round((dataset.valCount / splitTotal) * 100) : 20;
   const testPct = splitTotal > 0 ? Math.round((dataset.testCount / splitTotal) * 100) : 10;
 
-  const mockImages = Array.from({ length: 12 }, (_, i) => ({
-    id: i,
-    src: dataset.previewImages[i % dataset.previewImages.length],
-    labeled: i < Math.floor((12 * labelRate) / 100),
-  }));
+  const displayImages = realImages.length > 0
+    ? realImages.slice(0, 12).map((img, i) => ({
+        id: i,
+        src: img.url.startsWith('http') ? img.url : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${img.url}`,
+        labeled: img.has_labels,
+      }))
+    : Array.from({ length: Math.min(12, dataset.imageCount) }, (_, i) => ({
+        id: i,
+        src: dataset.previewImages[i % (dataset.previewImages.length || 1)] ?? '',
+        labeled: i < Math.floor((12 * labelRate) / 100),
+      }));
 
   // Helper to safely split datetime strings
   const formatDate = (dateStr: string) => {
@@ -237,12 +257,18 @@ export default function DatasetDetailModal({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[12px] text-gray-500">
-                  共 {dataset.imageCount.toLocaleString()} 张图片，展示前 12 张预览
+                  共 {dataset.imageCount.toLocaleString()} 张图片
+                  {realImages.length > 0 ? `，展示 ${Math.min(12, realImages.length)} 张` : '，展示前 12 张预览'}
                 </span>
                 <span className="text-[11px] text-gray-400">绿色边框 = 已标注</span>
               </div>
               <div className="grid grid-cols-4 gap-2">
-                {mockImages.map((img) => (
+                {imagesLoading ? (
+                  <div className="col-span-4 text-center py-8 text-gray-400 text-[12px]">
+                    <i className="ri-loader-4-line animate-spin text-[20px] block mb-2"></i>
+                    加载图片中...
+                  </div>
+                ) : displayImages.map((img) => (
                   <div
                     key={img.id}
                     className={`relative rounded-lg overflow-hidden border-2 ${

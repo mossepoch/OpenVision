@@ -1,19 +1,41 @@
 
 import { useState } from 'react';
-import { YOLO_CLASSES } from '../../../mocks/annotationData';
 import { BBox } from './AnnotationCanvas';
 import { Category } from './CategoryManager';
+import { api as apiClient } from '../../../api/client';
+
+/** Standard YOLO/COCO class names + custom industrial classes */
+const YOLO_CLASSES = [
+  'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',
+  'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
+  'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
+  'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+  'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove',
+  'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
+  'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
+  'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+  'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse',
+  'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+  'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
+  'toothbrush',
+  'helmet', 'glove', 'wrench', 'bolt', 'tool_box', 'engine_part', 'cable',
+  'safety_vest', 'goggles', 'boots',
+];
 
 interface AIPreAnnotationProps {
   categories: Category[];
   onAnnotationsGenerated: (annotations: BBox[]) => void;
   onClose: () => void;
+  datasetName?: string;   // 当前数据集名
+  imageFilename?: string; // 当前图片文件名
 }
 
 export default function AIPreAnnotation({
   categories,
   onAnnotationsGenerated,
   onClose,
+  datasetName,
+  imageFilename,
 }: AIPreAnnotationProps) {
   const [selectedClasses, setSelectedClasses] = useState<string[]>(
     categories.map((c) => c.name)
@@ -36,44 +58,50 @@ export default function AIPreAnnotation({
   const handleRun = async () => {
     try {
       setRunning(true);
-      setProgress(0);
-      // Simulate AI detection progress
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise((r) => setTimeout(r, 120));
-        setProgress(i);
-      }
+      setProgress(10);
 
-      // Generate mock detection results based on selected categories
-      const generated: BBox[] = [];
-      const matchedCats = categories.filter((c) =>
-        selectedClasses.includes(c.name)
-      );
-      if (matchedCats.length === 0) {
-        setRunning(false);
-        return;
-      }
+      // 有真实数据集和图片时调用后端 API
+      if (datasetName && imageFilename) {
+        setProgress(30);
+        const result = await apiClient.post<{ labels: string[]; count: number }>(
+          `/api/v1/datasets/${datasetName}/images/${imageFilename}/auto-label?confidence=${confidence}`,
+        );
+        setProgress(90);
+        const { labels } = result;
 
-      const count = Math.floor(Math.random() * 4) + 2;
-      for (let i = 0; i < count; i++) {
-        const cat =
-          matchedCats[Math.floor(Math.random() * matchedCats.length)];
-        const x = Math.random() * 0.6 + 0.05;
-        const y = Math.random() * 0.6 + 0.05;
-        const w = Math.random() * 0.2 + 0.08;
-        const h = Math.random() * 0.2 + 0.08;
-        generated.push({
-          id: `ai-${Date.now()}-${i}`,
-          categoryId: cat.id,
-          x: Math.min(x, 1 - w),
-          y: Math.min(y, 1 - h),
-          width: w,
-          height: h,
+        // 将 YOLO 格式标注转换为 BBox
+        const generated: BBox[] = labels.map((line, i) => {
+          const [cls, cx, cy, w, h] = line.split(' ').map(Number);
+          const cat = categories[cls] ?? categories[0];
+          return {
+            id: `ai-${Date.now()}-${i}`,
+            categoryId: cat?.id ?? String(cls),
+            x: cx - w / 2,
+            y: cy - h / 2,
+            width: w,
+            height: h,
+          };
         });
+        setProgress(100);
+        onAnnotationsGenerated(generated);
+      } else {
+        // fallback: mock（未选数据集时）
+        for (let i = 0; i <= 100; i += 10) {
+          await new Promise((r) => setTimeout(r, 80));
+          setProgress(i);
+        }
+        const matchedCats = categories.filter((c) => selectedClasses.includes(c.name));
+        if (matchedCats.length === 0) { setRunning(false); return; }
+        const generated: BBox[] = Array.from({ length: Math.floor(Math.random() * 3) + 1 }, (_, i) => {
+          const cat = matchedCats[Math.floor(Math.random() * matchedCats.length)];
+          const x = Math.random() * 0.6 + 0.05, y = Math.random() * 0.6 + 0.05;
+          const w = Math.random() * 0.2 + 0.08, h = Math.random() * 0.2 + 0.08;
+          return { id: `ai-${Date.now()}-${i}`, categoryId: cat.id, x: Math.min(x, 1 - w), y: Math.min(y, 1 - h), width: w, height: h };
+        });
+        onAnnotationsGenerated(generated);
       }
-
-      onAnnotationsGenerated(generated);
     } catch (error) {
-      console.error('AI pre‑annotation failed:', error);
+      console.error('AI pre-annotation failed:', error);
     } finally {
       setRunning(false);
       onClose();

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authApi } from '../../api/auth';
 
 import styles from './LoginPage.module.css';
 
@@ -42,15 +43,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!account.trim() || !password.trim()) {
       setError('请输入用户名和密码');
       return;
     }
     setError('');
-    navigate('/dashboard');
+    setLoading(true);
+    try {
+      const result = await authApi.login(account.trim(), password);
+      localStorage.setItem('access_token', result.access_token);
+      localStorage.setItem('user', JSON.stringify(result.user));
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '登录失败，请重试');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -219,8 +231,8 @@ export default function LoginPage() {
 
               {error && <div className={styles.errorText}>{error}</div>}
 
-              <button type="submit" className={styles.loginBtn}>
-                登录
+              <button type="submit" className={styles.loginBtn} disabled={loading}>
+                {loading ? '登录中...' : '登录'}
               </button>
             </div>
 
