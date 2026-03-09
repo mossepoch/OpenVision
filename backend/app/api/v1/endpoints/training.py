@@ -37,7 +37,7 @@ class TrainJob(BaseModel):
     dataset: str
     model_base: str
     epochs: int
-    status: str  # pending/running/done/failed
+    status: str  # pending/running/done/error (前端用error，后端统一映射)
     progress: float  # 0-100
     message: str
     started_at: Optional[float]
@@ -98,7 +98,7 @@ names: {labels}
         job["finished_at"] = time.time()
 
     except Exception as e:
-        job["status"] = "failed"
+        job["status"] = "error"  # 前端期望 error，不是 failed
         job["message"] = f"训练失败: {str(e)}"
         job["finished_at"] = time.time()
 
@@ -160,10 +160,13 @@ def list_trained_models():
         if d.is_dir():
             best = d / "weights" / "best.pt"
             last = d / "weights" / "last.pt"
+            created_at = int(best.stat().st_mtime) if best.exists() else None
             models.append({
                 "name": d.name,
+                "path": str(best) if best.exists() else None,
                 "best": str(best) if best.exists() else None,
                 "last": str(last) if last.exists() else None,
                 "size_mb": round(best.stat().st_size / 1024 / 1024, 1) if best.exists() else None,
+                "created_at": created_at,
             })
     return models

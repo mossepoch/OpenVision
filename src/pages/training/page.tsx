@@ -179,10 +179,10 @@ export default function TrainingPage() {
                   <div key={m.name} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
                     <div>
                       <div className="text-[12px] font-medium text-gray-700">{m.name}</div>
-                      <div className="text-[11px] text-gray-400">{m.size_mb.toFixed(1)} MB</div>
+                      <div className="text-[11px] text-gray-400">{m.size_mb != null ? `${m.size_mb.toFixed(1)} MB` : '未知大小'}</div>
                     </div>
                     <span className="text-[11px] text-gray-400">
-                      {new Date(m.created_at * 1000).toLocaleDateString('zh-CN')}
+                      {m.created_at ? new Date(m.created_at * 1000).toLocaleDateString('zh-CN') : '-'}
                     </span>
                   </div>
                 ))}
