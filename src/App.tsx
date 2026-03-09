@@ -6,7 +6,7 @@ import Sidebar from './components/feature/Sidebar';
 
 function AppContent() {
   const location = useLocation();
-  const noSidebarPaths = ['/', '/home'];
+  const noSidebarPaths = ['/', '/home', '/login'];
   const isNoSidebar = noSidebarPaths.includes(location.pathname);
 
   if (isNoSidebar) {

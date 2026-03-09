@@ -4,7 +4,7 @@
 
 Manage all your cameras in one place. Detect what matters. Keep your data local.
 
-![Dashboard](assets/dashboard.jpg)
+![Dashboard](assets/dashboard.png)
 
 OpenVision unifies IP cameras from any brand into a single dashboard with built-in AI — object detection, facial recognition, and behavior analysis — all running locally on your hardware. No cloud subscriptions. No vendor lock-in. No compromises.
 
@@ -41,17 +41,18 @@ Default: `http://localhost:3000`
 
 ## Screenshots
 
-### Login
-![Login](assets/login.jpg)
-
-### Dashboard
-![Dashboard](assets/dashboard.jpg)
-
-### Real-time Monitoring
-![Monitoring](assets/monitoring.jpg)
-
-### Device Management
-![Devices](assets/devices.jpg)
+<table>
+  <tr>
+    <td align="center"><b>Login</b><br><img src="assets/login.png" width="280"></td>
+    <td align="center"><b>Dashboard</b><br><img src="assets/dashboard.png" width="280"></td>
+    <td align="center"><b>Monitoring</b><br><img src="assets/monitoring.png" width="280"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Devices</b><br><img src="assets/devices.png" width="280"></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
 ---
 
