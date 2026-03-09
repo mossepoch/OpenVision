@@ -182,7 +182,7 @@ export default function TrainingPage() {
                       <div className="text-[11px] text-gray-400">{m.size_mb != null ? `${m.size_mb.toFixed(1)} MB` : '未知大小'}</div>
                     </div>
                     <span className="text-[11px] text-gray-400">
-                      {m.created_at ? new Date(m.created_at * 1000).toLocaleDateString('zh-CN') : '-'}
+                      {(m as any).created_at ? new Date((m as any).created_at * 1000).toLocaleDateString('zh-CN') : '-'}
                     </span>
                   </div>
                 ))}

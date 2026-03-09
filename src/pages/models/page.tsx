@@ -36,6 +36,8 @@ function mapToDisplayModel(m: TrainedModel): DisplayModel {
     : m.name.toLowerCase().includes('medium') || m.name.includes('m.') ? 'medium'
     : m.name.toLowerCase().includes('large') || m.name.includes('l.') ? 'large'
     : 'nano';
+  const createdAt = (m as any).created_at;
+  const modelPath = (m as any).path;
   return {
     id: m.name,
     name: m.name,
@@ -47,13 +49,13 @@ function mapToDisplayModel(m: TrainedModel): DisplayModel {
     mAP50: 0,
     mAP5095: 0,
     speed: '-',
-    description: `自训练模型 - ${m.path ?? m.name}`,
+    description: `自训练模型 - ${modelPath ?? m.name}`,
     downloadUrl: null,
-    downloaded: true,
-    lastUsed: m.created_at ? new Date(m.created_at * 1000).toLocaleString('zh-CN') : '-',
+    downloaded: !!(modelPath || m.size_mb),
+    lastUsed: createdAt ? new Date(createdAt * 1000).toLocaleString('zh-CN') : '-',
     trainedOn: '自定义数据集',
     classes: 0,
-    trainDate: m.created_at ? new Date(m.created_at * 1000).toLocaleDateString('zh-CN') : '-',
+    trainDate: createdAt ? new Date(createdAt * 1000).toLocaleDateString('zh-CN') : '-',
     baseModel: m.name.split('/').pop()?.split('_')[0] ?? 'yolov8n',
   };
 }
