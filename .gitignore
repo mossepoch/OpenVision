@@ -58,3 +58,10 @@ backend/snapshots/
 backend/trained_models/
 backend/app/datasets/
 backend/app/snapshots/
+
+# Build output
+out/
+
+# Backend runtime data
+backend/data/
+backend/exports/
