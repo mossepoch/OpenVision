@@ -69,11 +69,28 @@ Default: `http://localhost:3000`
 
 ## Tech Stack
 
-- **Frontend:** React 19 + TypeScript + Vite 7
+- **Frontend:** React 19 + TypeScript + Vite 7 + SWC
 - **Styling:** Tailwind CSS
-- **State:** React Router + Context
+- **Routing:** React Router
 - **Charts:** Recharts
 - **i18n:** i18next
+- **Quality:** ESLint + TypeScript type checking
+
+## Architecture
+
+The frontend is built with a modern React 19 + TypeScript architecture, using Vite 7 and SWC for fast local development and efficient production builds.
+
+From an engineering perspective, the application is organized by business domains such as Dashboard, Monitoring, Devices, Datasets, Training, and Reports, which keeps feature boundaries clear and makes the codebase easier to scale.
+
+At a high level, the architecture includes:
+
+- **UI Layer** — reusable React components with a consistent console-style interface powered by Tailwind CSS
+- **Routing Layer** — React Router drives navigation and module-level page composition
+- **Internationalization Layer** — i18next provides multilingual delivery capability for broader deployment scenarios
+- **Visualization Layer** — Recharts supports operational dashboards, alert trends, and device analytics
+- **Engineering Layer** — TypeScript and ESLint provide baseline maintainability, consistency, and code quality controls
+
+The project also keeps room for integration with external services such as Supabase, Firebase, and Stripe when authentication, backend services, or commercial capabilities are needed.
 
 ---
 
